@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Navbar from './Navbar';
 
 export default function UserProfile() {
   const { user, updateProfile, updateEmail, setTheme } = useAuth();
@@ -87,25 +87,14 @@ export default function UserProfile() {
 
   return (
     <div className="min-h-screen bg-theme-primary">
-      <header className="bg-theme-card shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-theme-primary">Profile Settings</h1>
-            <p className="text-theme-muted">Manage your account information</p>
-          </div>
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-theme-muted hover:text-theme-primary px-3 py-2 rounded-md hover:bg-theme-secondary transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-            <span className="hidden sm:inline">Back to Library</span>
-          </Link>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="max-w-2xl mx-auto py-8 px-4">
+        {/* Page header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-theme-primary">Profile Settings</h1>
+          <p className="text-theme-muted">Manage your account information</p>
+        </div>
         {/* Status messages */}
         {message && (
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">

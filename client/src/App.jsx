@@ -7,6 +7,7 @@ import ResetPasswordPage from './components/ResetPasswordPage';
 import Library from './components/Library';
 import UserProfile from './components/UserProfile';
 import FAQPage from './components/FAQPage';
+import QuizPage from './components/QuizPage';
 
 // Loading spinner component
 function LoadingScreen() {
@@ -101,6 +102,14 @@ function App() {
         }
       />
       <Route path="/faq" element={<FAQPage />} />
+      <Route
+        path="/quiz"
+        element={
+          <ProtectedRoute>
+            <QuizPage />
+          </ProtectedRoute>
+        }
+      />
       {/* Catch all - redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

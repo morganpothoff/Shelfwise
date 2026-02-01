@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Navbar from './Navbar';
 
 const faqs = [
   {
@@ -139,25 +140,7 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-theme-gradient">
-      {/* Header */}
-      <header className="bg-theme-card shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to={isAuthenticated ? '/' : '/login'} className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-theme-accent rounded-xl flex items-center justify-center shadow">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-theme-on-primary" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-theme-primary">Shelfwise</h1>
-          </Link>
-          <Link
-            to={isAuthenticated ? '/' : '/login'}
-            className="text-theme-secondary hover:text-theme-primary transition-colors"
-          >
-            {isAuthenticated ? 'Back to Library' : 'Sign In'}
-          </Link>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 py-8">
@@ -174,15 +157,9 @@ export default function FAQPage() {
         <div className="mt-12 text-center">
           <div className="bg-theme-card rounded-xl shadow-md p-6">
             <h3 className="text-lg font-semibold text-theme-primary mb-2">Still have questions?</h3>
-            <p className="text-theme-muted mb-4">
+            <p className="text-theme-muted">
               If you couldn't find the answer you were looking for, check out the README file in the project repository or open an issue on GitHub.
             </p>
-            <Link
-              to={isAuthenticated ? '/' : '/login'}
-              className="inline-block py-2 px-6 bg-theme-accent bg-theme-accent-hover text-theme-on-primary font-semibold rounded-lg transition"
-            >
-              {isAuthenticated ? 'Back to Library' : 'Go to Login'}
-            </Link>
           </div>
         </div>
       </main>
