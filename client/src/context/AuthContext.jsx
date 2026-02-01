@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser, updateTheme as apiUpdateTheme, updateProfile as apiUpdateProfile } from '../services/api';
+import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser, updateTheme as apiUpdateTheme, updateProfile as apiUpdateProfile, updateEmail as apiUpdateEmail } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -98,6 +98,17 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function updateEmail(email, password) {
+    try {
+      const data = await apiUpdateEmail(email, password);
+      setUser(data.user);
+      return { success: true, message: data.message };
+    } catch (err) {
+      console.error('Email update error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   function clearError() {
     setError(null);
   }
@@ -111,6 +122,7 @@ export function AuthProvider({ children }) {
     logout,
     setTheme,
     updateProfile,
+    updateEmail,
     clearError,
     isAuthenticated: !!user
   };

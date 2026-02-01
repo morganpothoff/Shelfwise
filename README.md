@@ -121,7 +121,34 @@ npm run db:setup
 
 You should see a message saying "Database setup complete!"
 
-### Step 6: Start Shelfwise
+### Step 6: Configure Email (Optional)
+
+Shelfwise can send password reset emails using [Resend](https://resend.com). This is optional - the app works without it, but users won't be able to reset forgotten passwords via email.
+
+#### Setting Up Resend:
+
+1. Go to https://resend.com and create a free account
+2. In the Resend dashboard, go to **API Keys**
+3. Click **Create API Key**, give it a name, and copy the key (it starts with `re_`)
+4. When starting Shelfwise, include your API key:
+
+```bash
+RESEND_API_KEY=re_your_key_here npm run dev
+```
+
+#### For Production:
+If you have a custom domain, you can also configure:
+- `APP_URL` - Your app's public URL (default: `http://localhost:3000`)
+- `FROM_EMAIL` - The sender email address (default: `Shelfwise <onboarding@resend.dev>`)
+
+Example:
+```bash
+RESEND_API_KEY=re_xxx APP_URL=https://myshelfwise.com FROM_EMAIL="Shelfwise <noreply@myshelfwise.com>" npm run dev
+```
+
+**Note**: Without Resend configured, password reset links will be logged to the server console for development purposes.
+
+### Step 7: Start Shelfwise
 
 Run this command to start the application:
 
@@ -129,12 +156,17 @@ Run this command to start the application:
 npm run dev
 ```
 
+Or with email support:
+```bash
+RESEND_API_KEY=re_your_key_here npm run dev
+```
+
 You'll see some messages appear. Wait until you see something like:
 ```
 Shelfwise server running on http://localhost:3001
 ```
 
-### Step 7: Open Shelfwise in Your Browser
+### Step 8: Open Shelfwise in Your Browser
 
 1. Open your web browser (Chrome, Firefox, Safari, Edge, etc.)
 2. Type this address in the URL bar and press Enter:
@@ -144,7 +176,7 @@ Shelfwise server running on http://localhost:3001
 
 **Congratulations!** You should now see the Shelfwise login page!
 
-### Step 8: Create Your Account
+### Step 9: Create Your Account
 
 1. Click "Create one" to go to the registration page
 2. Enter your email address and choose a password (at least 8 characters)
@@ -260,6 +292,9 @@ shelfwise/
 | POST | `/api/auth/login` | Sign in |
 | POST | `/api/auth/logout` | Sign out |
 | GET | `/api/auth/me` | Get current user |
+| POST | `/api/auth/forgot-password` | Request password reset email |
+| GET | `/api/auth/validate-reset-token` | Validate reset token |
+| POST | `/api/auth/reset-password` | Reset password with token |
 
 #### Books (Requires Authentication)
 | Method | Endpoint | Description |

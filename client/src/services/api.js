@@ -14,8 +14,9 @@ async function fetchWithCredentials(url, options = {}) {
   // Handle 401 - redirect to login if session expired
   if (response.status === 401) {
     // Only redirect if we're not already on an auth page
-    if (!window.location.pathname.startsWith('/login') &&
-        !window.location.pathname.startsWith('/register')) {
+    const authPages = ['/login', '/register', '/forgot-password', '/reset-password'];
+    const isAuthPage = authPages.some(page => window.location.pathname.startsWith(page));
+    if (!isAuthPage) {
       window.location.href = '/login';
     }
   }
@@ -105,6 +106,59 @@ export async function updateProfile(updates) {
 
   if (!response.ok) {
     throw new Error(data.error || 'Failed to update profile');
+  }
+
+  return data;
+}
+
+export async function updateEmail(email, password) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/email`, {
+    method: 'PUT',
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update email');
+  }
+
+  return data;
+}
+
+export async function forgotPassword(email) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/forgot-password`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to send reset email');
+  }
+
+  return data;
+}
+
+export async function validateResetToken(token) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/validate-reset-token?token=${encodeURIComponent(token)}`);
+
+  const data = await response.json();
+
+  return data;
+}
+
+export async function resetPassword(token, password) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to reset password');
   }
 
   return data;

@@ -63,7 +63,7 @@ export function validateSession(token) {
   if (!token) return null;
 
   const session = db.prepare(`
-    SELECT s.*, u.id as user_id, u.email, u.name, u.theme
+    SELECT s.*, u.id as user_id, u.email, u.name, u.theme, u.email_verified
     FROM sessions s
     JOIN users u ON s.user_id = u.id
     WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -75,7 +75,8 @@ export function validateSession(token) {
     id: session.user_id,
     email: session.email,
     name: session.name,
-    theme: session.theme || 'purple'
+    theme: session.theme || 'purple',
+    emailVerified: !!session.email_verified
   };
 }
 
@@ -146,48 +147,143 @@ export function findUserByEmail(email) {
  * @returns {object|null} User object without password_hash, or null
  */
 export function findUserById(id) {
-  const user = db.prepare('SELECT id, email, name, theme, created_at FROM users WHERE id = ?').get(id);
-  return user || null;
+  const user = db.prepare('SELECT id, email, name, theme, email_verified, created_at FROM users WHERE id = ?').get(id);
+  if (!user) return null;
+  return {
+    ...user,
+    emailVerified: !!user.email_verified
+  };
 }
 
 /**
- * Update user's profile (name and/or email)
+ * Update user's profile (name only - email changes require password verification)
  * @param {number} userId - User ID
- * @param {object} updates - Object with name and/or email
+ * @param {object} updates - Object with name
  * @returns {object} Updated user object
  */
 export function updateUserProfile(userId, updates) {
-  const { name, email } = updates;
+  const { name } = updates;
 
-  // Check if email is being changed and if it's already taken
-  if (email) {
-    const existingUser = findUserByEmail(email);
-    if (existingUser && existingUser.id !== userId) {
-      throw new Error('An account with this email already exists');
-    }
-  }
-
-  const fields = [];
-  const values = [];
-
-  if (name !== undefined) {
-    fields.push('name = ?');
-    values.push(name?.trim() || null);
-  }
-
-  if (email) {
-    fields.push('email = ?');
-    values.push(email.toLowerCase().trim());
-  }
-
-  if (fields.length === 0) {
+  if (name === undefined) {
     return findUserById(userId);
   }
 
-  values.push(userId);
-  db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name?.trim() || null, userId);
 
   return findUserById(userId);
+}
+
+/**
+ * Update user's email (requires password verification, invalidates other sessions)
+ * @param {number} userId - User ID
+ * @param {string} newEmail - New email address
+ * @param {string} currentSessionToken - Current session to preserve
+ * @returns {object} Updated user object
+ */
+export function updateUserEmail(userId, newEmail, currentSessionToken) {
+  const normalizedEmail = newEmail.toLowerCase().trim();
+
+  // Check if email is already taken
+  const existingUser = findUserByEmail(normalizedEmail);
+  if (existingUser && existingUser.id !== userId) {
+    throw new Error('An account with this email already exists');
+  }
+
+  // Update email and set email_verified to false
+  db.prepare('UPDATE users SET email = ?, email_verified = 0 WHERE id = ?').run(normalizedEmail, userId);
+
+  // Invalidate all other sessions for security (keep current session)
+  if (currentSessionToken) {
+    db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').run(userId, currentSessionToken);
+  }
+
+  return findUserById(userId);
+}
+
+/**
+ * Get user with password hash for verification
+ * @param {number} userId - User ID
+ * @returns {object|null} User object with password_hash
+ */
+export function findUserByIdWithPassword(userId) {
+  return db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+}
+
+// Password reset token duration (1 hour)
+const PASSWORD_RESET_DURATION = 60 * 60 * 1000;
+
+/**
+ * Create a password reset token for a user
+ * @param {number} userId - User ID
+ * @returns {string} The reset token
+ */
+export function createPasswordResetToken(userId) {
+  // Invalidate any existing tokens for this user
+  db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(userId);
+
+  const token = uuidv4();
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_DURATION);
+
+  db.prepare(`
+    INSERT INTO password_reset_tokens (user_id, token, expires_at)
+    VALUES (?, ?, ?)
+  `).run(userId, token, expiresAt.toISOString());
+
+  return token;
+}
+
+/**
+ * Validate a password reset token and return the associated user
+ * @param {string} token - The reset token
+ * @returns {object|null} User object if valid, null otherwise
+ */
+export function validatePasswordResetToken(token) {
+  if (!token) return null;
+
+  const resetToken = db.prepare(`
+    SELECT prt.*, u.id as user_id, u.email, u.name
+    FROM password_reset_tokens prt
+    JOIN users u ON prt.user_id = u.id
+    WHERE prt.token = ? AND prt.used = 0 AND prt.expires_at > datetime('now')
+  `).get(token);
+
+  if (!resetToken) return null;
+
+  return {
+    id: resetToken.user_id,
+    email: resetToken.email,
+    name: resetToken.name,
+    tokenId: resetToken.id
+  };
+}
+
+/**
+ * Mark a password reset token as used
+ * @param {string} token - The reset token
+ */
+export function markPasswordResetTokenUsed(token) {
+  db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE token = ?').run(token);
+}
+
+/**
+ * Reset a user's password
+ * @param {number} userId - User ID
+ * @param {string} newPassword - The new password (will be hashed)
+ */
+export async function resetPassword(userId, newPassword) {
+  const passwordHash = await hashPassword(newPassword);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+
+  // Invalidate all sessions for this user (force re-login)
+  deleteAllUserSessions(userId);
+}
+
+/**
+ * Clean up expired password reset tokens
+ */
+export function cleanExpiredPasswordResetTokens() {
+  const result = db.prepare("DELETE FROM password_reset_tokens WHERE expires_at <= datetime('now') OR used = 1").run();
+  return result.changes;
 }
 
 /**
@@ -219,8 +315,15 @@ export default {
   createUser,
   findUserByEmail,
   findUserById,
+  findUserByIdWithPassword,
   updateUserProfile,
+  updateUserEmail,
   updateUserTheme,
+  createPasswordResetToken,
+  validatePasswordResetToken,
+  markPasswordResetTokenUsed,
+  resetPassword,
+  cleanExpiredPasswordResetTokens,
   SESSION_DURATION_DEFAULT,
   SESSION_DURATION_REMEMBER
 };
