@@ -6,24 +6,24 @@ export default function BookListItem({ book, onDelete, onEditSeries, showSeriesP
   };
 
   return (
-    <div className="flex items-center justify-between py-2 px-4 bg-white border-b border-gray-100 hover:bg-gray-50 group">
+    <div className="flex items-center justify-between py-2 px-4 bg-theme-card border-b border-theme hover:bg-theme-secondary group">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {showSeriesPosition && book.series_position != null && (
-          <span className="flex-shrink-0 w-5 h-5 bg-purple-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+          <span className="flex-shrink-0 w-5 h-5 bg-theme-accent text-theme-on-primary text-xs font-bold rounded-full flex items-center justify-center">
             {Number.isInteger(book.series_position) ? book.series_position : book.series_position.toFixed(1)}
           </span>
         )}
         <div className="min-w-0">
-          <span className="font-medium text-gray-900">{book.title}</span>
+          <span className="font-medium text-theme-primary">{book.title}</span>
           {book.author && (
-            <span className="text-gray-500 ml-2">by {book.author}</span>
+            <span className="text-theme-muted ml-2">by {book.author}</span>
           )}
         </div>
       </div>
       <div className="flex gap-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
         <button
           onClick={() => onEditSeries(book)}
-          className="text-gray-400 hover:text-purple-600"
+          className="text-theme-muted hover:text-theme-secondary"
           title="Edit series"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -32,7 +32,7 @@ export default function BookListItem({ book, onDelete, onEditSeries, showSeriesP
         </button>
         <button
           onClick={handleDelete}
-          className="text-gray-400 hover:text-red-500"
+          className="text-theme-muted hover:text-red-500"
           title="Remove from library"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

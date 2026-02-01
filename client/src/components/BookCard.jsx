@@ -6,11 +6,11 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow relative group">
+    <div className="bg-theme-card rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow relative group">
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onEditSeries(book)}
-          className="text-gray-400 hover:text-purple-600"
+          className="text-theme-muted hover:text-theme-secondary"
           title="Edit series"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -19,7 +19,7 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
         </button>
         <button
           onClick={handleDelete}
-          className="text-gray-400 hover:text-red-500"
+          className="text-theme-muted hover:text-red-500"
           title="Remove from library"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -30,32 +30,32 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
 
       <div className="flex items-start gap-2 mb-1">
         {showSeriesPosition && book.series_position != null && (
-          <span className="flex-shrink-0 w-6 h-6 bg-purple-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+          <span className="flex-shrink-0 w-6 h-6 bg-theme-accent text-theme-on-primary text-xs font-bold rounded-full flex items-center justify-center">
             {Number.isInteger(book.series_position) ? book.series_position : book.series_position.toFixed(1)}
           </span>
         )}
-        <h3 className="text-lg font-semibold text-gray-900 pr-12">{book.title}</h3>
+        <h3 className="text-lg font-semibold text-theme-primary pr-12">{book.title}</h3>
       </div>
 
       {book.author && (
-        <p className="text-gray-600 mb-2">{showSeriesPosition && book.series_position != null ? <span className="ml-8">by {book.author}</span> : `by ${book.author}`}</p>
+        <p className="text-theme-muted mb-2">{showSeriesPosition && book.series_position != null ? <span className="ml-8">by {book.author}</span> : `by ${book.author}`}</p>
       )}
 
       <div className="flex flex-wrap gap-2 mb-3">
         {book.page_count && (
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+          <span className="text-xs bg-theme-secondary text-theme-muted px-2 py-1 rounded">
             {book.page_count} pages
           </span>
         )}
         {book.genre && (
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+          <span className="text-xs bg-theme-series text-theme-series px-2 py-1 rounded">
             {book.genre}
           </span>
         )}
       </div>
 
       {book.synopsis && (
-        <p className="text-sm text-gray-700 mb-3 line-clamp-3">
+        <p className="text-sm text-theme-muted mb-3 line-clamp-3">
           {book.synopsis}
         </p>
       )}
@@ -65,13 +65,13 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
           {book.tags.slice(0, 5).map((tag, index) => (
             <span
               key={index}
-              className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded"
+              className="text-xs bg-theme-series text-theme-series px-2 py-1 rounded"
             >
               {tag}
             </span>
           ))}
           {book.tags.length > 5 && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-theme-muted">
               +{book.tags.length - 5} more
             </span>
           )}
@@ -79,7 +79,7 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
       )}
 
       {book.isbn && (
-        <p className="text-xs text-gray-400 mt-3">ISBN: {book.isbn}</p>
+        <p className="text-xs text-theme-muted mt-3">ISBN: {book.isbn}</p>
       )}
     </div>
   );

@@ -35,24 +35,24 @@ export default function EditSeriesModal({ book, onSave, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+      <div className="bg-theme-card rounded-lg p-6 max-w-md w-full">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Edit Series Info</h2>
+          <h2 className="text-xl font-semibold text-theme-primary">Edit Series Info</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl"
+            className="text-theme-muted hover:text-theme-primary text-2xl"
           >
             &times;
           </button>
         </div>
 
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-theme-secondary mb-4">
           <strong>{book.title}</strong> by {book.author}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="seriesName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="seriesName" className="block text-sm font-medium text-theme-primary mb-1">
               Series Name
             </label>
             <input
@@ -61,7 +61,7 @@ export default function EditSeriesModal({ book, onSave, onClose }) {
               value={seriesName}
               onChange={(e) => setSeriesName(e.target.value)}
               placeholder="e.g., The Lunar Chronicles"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-theme rounded-md focus:outline-none focus:ring-2 focus:ring-theme-accent"
               list="existing-series"
             />
             <datalist id="existing-series">
@@ -69,13 +69,13 @@ export default function EditSeriesModal({ book, onSave, onClose }) {
                 <option key={s} value={s} />
               ))}
             </datalist>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-theme-muted mt-1">
               Select from existing series or enter a new one
             </p>
           </div>
 
           <div>
-            <label htmlFor="seriesPosition" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="seriesPosition" className="block text-sm font-medium text-theme-primary mb-1">
               Position in Series
             </label>
             <input
@@ -86,9 +86,9 @@ export default function EditSeriesModal({ book, onSave, onClose }) {
               placeholder="e.g., 1, 2, 3.5"
               step="0.1"
               min="0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-theme rounded-md focus:outline-none focus:ring-2 focus:ring-theme-accent"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-theme-muted mt-1">
               Use decimals for novellas (e.g., 0.5, 1.5, 3.5)
             </p>
           </div>
@@ -101,20 +101,20 @@ export default function EditSeriesModal({ book, onSave, onClose }) {
             <button
               type="button"
               onClick={handleClear}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-theme rounded-md text-theme-primary hover:bg-theme-secondary"
             >
               Clear Series
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="flex-1 px-4 py-2 border border-theme rounded-md text-theme-primary hover:bg-theme-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="flex-1 px-4 py-2 bg-theme-accent bg-theme-accent-hover text-theme-on-primary rounded-md"
             >
               Save
             </button>
