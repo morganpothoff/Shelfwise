@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import Library from './components/Library';
+import UserProfile from './components/UserProfile';
 
 // Loading spinner component
 function LoadingScreen() {
@@ -73,6 +74,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Library />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <UserProfile />
           </ProtectedRoute>
         }
       />

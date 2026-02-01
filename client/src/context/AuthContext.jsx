@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser, updateTheme as apiUpdateTheme } from '../services/api';
+import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser, updateTheme as apiUpdateTheme, updateProfile as apiUpdateProfile } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -87,6 +87,17 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function updateProfile(updates) {
+    try {
+      const data = await apiUpdateProfile(updates);
+      setUser(data.user);
+      return { success: true };
+    } catch (err) {
+      console.error('Profile update error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   function clearError() {
     setError(null);
   }
@@ -99,6 +110,7 @@ export function AuthProvider({ children }) {
     register,
     logout,
     setTheme,
+    updateProfile,
     clearError,
     isAuthenticated: !!user
   };

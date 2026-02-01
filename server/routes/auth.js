@@ -6,6 +6,7 @@ import {
   createSession,
   deleteSession,
   validateSession,
+  updateUserProfile,
   updateUserTheme
 } from '../services/auth.js';
 
@@ -168,6 +169,48 @@ router.get('/me', (req, res) => {
   } catch (error) {
     console.error('Auth check error:', error);
     res.status(500).json({ error: 'Authentication check failed' });
+  }
+});
+
+// PUT /api/auth/profile - Update user's profile
+router.put('/profile', async (req, res) => {
+  try {
+    const sessionToken = req.cookies?.session_token;
+
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = validateSession(sessionToken);
+
+    if (!user) {
+      res.clearCookie('session_token', { path: '/' });
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    const { name, email } = req.body;
+
+    // Validate email if provided
+    if (email && !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    const updatedUser = updateUserProfile(user.id, { name, email });
+
+    res.json({
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        theme: updatedUser.theme
+      }
+    });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    if (error.message.includes('already exists')) {
+      return res.status(409).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

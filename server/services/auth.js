@@ -151,6 +151,46 @@ export function findUserById(id) {
 }
 
 /**
+ * Update user's profile (name and/or email)
+ * @param {number} userId - User ID
+ * @param {object} updates - Object with name and/or email
+ * @returns {object} Updated user object
+ */
+export function updateUserProfile(userId, updates) {
+  const { name, email } = updates;
+
+  // Check if email is being changed and if it's already taken
+  if (email) {
+    const existingUser = findUserByEmail(email);
+    if (existingUser && existingUser.id !== userId) {
+      throw new Error('An account with this email already exists');
+    }
+  }
+
+  const fields = [];
+  const values = [];
+
+  if (name !== undefined) {
+    fields.push('name = ?');
+    values.push(name?.trim() || null);
+  }
+
+  if (email) {
+    fields.push('email = ?');
+    values.push(email.toLowerCase().trim());
+  }
+
+  if (fields.length === 0) {
+    return findUserById(userId);
+  }
+
+  values.push(userId);
+  db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+
+  return findUserById(userId);
+}
+
+/**
  * Update user's theme preference
  * @param {number} userId - User ID
  * @param {string} theme - Theme name ('purple', 'light', 'dark')
@@ -179,6 +219,7 @@ export default {
   createUser,
   findUserByEmail,
   findUserById,
+  updateUserProfile,
   updateUserTheme,
   SESSION_DURATION_DEFAULT,
   SESSION_DURATION_REMEMBER

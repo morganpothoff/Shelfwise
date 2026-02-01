@@ -95,6 +95,21 @@ export async function updateTheme(theme) {
   return data;
 }
 
+export async function updateProfile(updates) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/profile`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update profile');
+  }
+
+  return data;
+}
+
 // ============ BOOKS API ============
 
 export async function scanISBN(isbn) {
