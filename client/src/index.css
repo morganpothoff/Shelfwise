@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   THEME SYSTEM
+   ============================================ */
+
+/* Base theme variables (used for login/register - whimsical blue) */
+:root {
+  --color-primary: 59 130 246;      /* blue-500 */
+  --color-primary-dark: 37 99 235;   /* blue-600 */
+  --color-primary-light: 96 165 250; /* blue-400 */
+  --color-accent: 99 102 241;        /* indigo-500 */
+
+  --color-bg-primary: 239 246 255;   /* blue-50 */
+  --color-bg-secondary: 219 234 254; /* blue-100 */
+  --color-bg-card: 255 255 255;      /* white */
+
+  --color-text-primary: 30 58 138;   /* blue-900 */
+  --color-text-secondary: 59 130 246; /* blue-500 */
+  --color-text-muted: 107 114 128;   /* gray-500 */
+  --color-text-on-primary: 255 255 255; /* white */
+
+  --color-border: 191 219 254;       /* blue-200 */
+  --color-series-bg: 239 246 255;    /* blue-50 */
+  --color-series-text: 37 99 235;    /* blue-600 */
+}
+
+/* Purple Theme (default for logged-in users) */
+.theme-purple {
+  --color-primary: 147 51 234;       /* purple-600 */
+  --color-primary-dark: 126 34 206;  /* purple-700 */
+  --color-primary-light: 168 85 247; /* purple-500 */
+  --color-accent: 236 72 153;        /* pink-500 */
+
+  --color-bg-primary: 250 245 255;   /* purple-50 */
+  --color-bg-secondary: 243 232 255; /* purple-100 */
+  --color-bg-card: 255 255 255;      /* white */
+
+  --color-text-primary: 88 28 135;   /* purple-900 */
+  --color-text-secondary: 147 51 234; /* purple-600 */
+  --color-text-muted: 107 114 128;   /* gray-500 */
+  --color-text-on-primary: 255 255 255; /* white */
+
+  --color-border: 216 180 254;       /* purple-300 */
+  --color-series-bg: 243 232 255;    /* purple-100 */
+  --color-series-text: 126 34 206;   /* purple-700 */
+}
+
+/* Light Theme (clean white) */
+.theme-light {
+  --color-primary: 71 85 105;        /* slate-600 */
+  --color-primary-dark: 51 65 85;    /* slate-700 */
+  --color-primary-light: 100 116 139; /* slate-500 */
+  --color-accent: 20 184 166;        /* teal-500 */
+
+  --color-bg-primary: 248 250 252;   /* slate-50 */
+  --color-bg-secondary: 241 245 249; /* slate-100 */
+  --color-bg-card: 255 255 255;      /* white */
+
+  --color-text-primary: 15 23 42;    /* slate-900 */
+  --color-text-secondary: 71 85 105; /* slate-600 */
+  --color-text-muted: 148 163 184;   /* slate-400 */
+  --color-text-on-primary: 255 255 255; /* white */
+
+  --color-border: 226 232 240;       /* slate-200 */
+  --color-series-bg: 241 245 249;    /* slate-100 */
+  --color-series-text: 51 65 85;     /* slate-700 */
+}
+
+/* Dark Theme */
+.theme-dark {
+  --color-primary: 167 139 250;      /* violet-400 */
+  --color-primary-dark: 139 92 246;  /* violet-500 */
+  --color-primary-light: 196 181 253; /* violet-300 */
+  --color-accent: 251 146 60;        /* orange-400 */
+
+  --color-bg-primary: 15 23 42;      /* slate-900 */
+  --color-bg-secondary: 30 41 59;    /* slate-800 */
+  --color-bg-card: 51 65 85;         /* slate-700 */
+
+  --color-text-primary: 248 250 252; /* slate-50 */
+  --color-text-secondary: 203 213 225; /* slate-300 */
+  --color-text-muted: 148 163 184;   /* slate-400 */
+  --color-text-on-primary: 15 23 42; /* slate-900 */
+
+  --color-border: 71 85 105;         /* slate-600 */
+  --color-series-bg: 30 41 59;       /* slate-800 */
+  --color-series-text: 196 181 253;  /* violet-300 */
+}
+
+/* ============================================
+   UTILITY CLASSES FOR THEMES
+   ============================================ */
+
+@layer utilities {
+  /* Background colors */
+  .bg-theme-primary {
+    background-color: rgb(var(--color-bg-primary));
+  }
+  .bg-theme-secondary {
+    background-color: rgb(var(--color-bg-secondary));
+  }
+  .bg-theme-card {
+    background-color: rgb(var(--color-bg-card));
+  }
+  .bg-theme-accent {
+    background-color: rgb(var(--color-primary));
+  }
+  .bg-theme-accent-hover:hover {
+    background-color: rgb(var(--color-primary-dark));
+  }
+  .bg-theme-series {
+    background-color: rgb(var(--color-series-bg));
+  }
+
+  /* Text colors */
+  .text-theme-primary {
+    color: rgb(var(--color-text-primary));
+  }
+  .text-theme-secondary {
+    color: rgb(var(--color-text-secondary));
+  }
+  .text-theme-muted {
+    color: rgb(var(--color-text-muted));
+  }
+  .text-theme-on-primary {
+    color: rgb(var(--color-text-on-primary));
+  }
+  .text-theme-series {
+    color: rgb(var(--color-series-text));
+  }
+
+  /* Border colors */
+  .border-theme {
+    border-color: rgb(var(--color-border));
+  }
+  .border-theme-accent {
+    border-color: rgb(var(--color-primary));
+  }
+
+  /* Ring/focus colors */
+  .ring-theme-accent {
+    --tw-ring-color: rgb(var(--color-primary));
+  }
+  .focus\:ring-theme-accent:focus {
+    --tw-ring-color: rgb(var(--color-primary));
+  }
+
+  /* Gradient backgrounds */
+  .bg-theme-gradient {
+    background: linear-gradient(
+      135deg,
+      rgb(var(--color-bg-primary)) 0%,
+      rgb(var(--color-bg-secondary)) 100%
+    );
+  }
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea {
+  background-color: rgb(var(--color-bg-card));
+  border-color: rgb(var(--color-border));
+  color: rgb(var(--color-text-primary));
+}
+
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder {
+  color: rgb(var(--color-text-muted));
+}
+
+.theme-dark input:focus,
+.theme-dark select:focus,
+.theme-dark textarea:focus {
+  border-color: rgb(var(--color-primary));
+  --tw-ring-color: rgb(var(--color-primary) / 0.5);
+}
+
+/* Checkbox styling for dark mode */
+.theme-dark input[type="checkbox"] {
+  background-color: rgb(var(--color-bg-secondary));
+}
+
+.theme-dark input[type="checkbox"]:checked {
+  background-color: rgb(var(--color-primary));
+}
