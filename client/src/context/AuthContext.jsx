@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser, updateTheme as apiUpdateTheme, updateProfile as apiUpdateProfile, updateEmail as apiUpdateEmail } from '../services/api';
+import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser, updateTheme as apiUpdateTheme, updateProfile as apiUpdateProfile, updateEmail as apiUpdateEmail, deleteAccount as apiDeleteAccount } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -109,6 +109,18 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function deleteAccount(password) {
+    try {
+      await apiDeleteAccount(password);
+      setUser(null);
+      document.documentElement.classList.remove('theme-purple', 'theme-light', 'theme-dark');
+      return { success: true };
+    } catch (err) {
+      console.error('Account deletion error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   function clearError() {
     setError(null);
   }
@@ -123,6 +135,7 @@ export function AuthProvider({ children }) {
     setTheme,
     updateProfile,
     updateEmail,
+    deleteAccount,
     clearError,
     isAuthenticated: !!user
   };

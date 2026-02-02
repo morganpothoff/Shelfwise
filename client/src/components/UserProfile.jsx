@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Navbar from './Navbar';
+import DeleteAccountModal from './DeleteAccountModal';
 
 export default function UserProfile() {
   const { user, updateProfile, updateEmail, setTheme } = useAuth();
@@ -11,6 +12,7 @@ export default function UserProfile() {
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   async function handleNameSubmit(e) {
     e.preventDefault();
@@ -238,7 +240,7 @@ export default function UserProfile() {
         </div>
 
         {/* Theme Selection */}
-        <div className="bg-theme-card rounded-2xl shadow-xl p-8">
+        <div className="bg-theme-card rounded-2xl shadow-xl p-8 mb-6">
           <h3 className="text-lg font-semibold text-theme-primary mb-4">Theme Preference</h3>
           <div className="space-y-3">
             {themes.map((theme) => (
@@ -283,7 +285,27 @@ export default function UserProfile() {
             ))}
           </div>
         </div>
+
+        {/* Danger Zone - Delete Account */}
+        <div className="bg-theme-card rounded-2xl shadow-xl p-8 border-2 border-red-200">
+          <h3 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h3>
+          <p className="text-sm text-theme-muted mb-4">
+            Once you delete your account, there is no going back. Please be certain.
+          </p>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="py-3 px-6 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition"
+          >
+            Delete Account
+          </button>
+        </div>
       </main>
+
+      {/* Delete Account Modal */}
+      <DeleteAccountModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+      />
     </div>
   );
 }

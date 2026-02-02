@@ -303,6 +303,26 @@ export function updateUserTheme(userId, theme) {
   return findUserById(userId);
 }
 
+/**
+ * Delete a user account and all associated data
+ * @param {number} userId - User ID to delete
+ */
+export function deleteUser(userId) {
+  // Delete all sessions for this user
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+
+  // Delete all password reset tokens for this user
+  db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(userId);
+
+  // Delete any reading history for this user
+  db.prepare('DELETE FROM reading_history WHERE user_id = ?').run(userId);
+
+  // Delete the user record
+  const result = db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+
+  return result.changes > 0;
+}
+
 export default {
   hashPassword,
   verifyPassword,
@@ -319,6 +339,7 @@ export default {
   updateUserProfile,
   updateUserEmail,
   updateUserTheme,
+  deleteUser,
   createPasswordResetToken,
   validatePasswordResetToken,
   markPasswordResetTokenUsed,

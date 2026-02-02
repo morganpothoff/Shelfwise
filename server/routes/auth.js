@@ -10,6 +10,7 @@ import {
   updateUserProfile,
   updateUserEmail,
   updateUserTheme,
+  deleteUser,
   createPasswordResetToken,
   validatePasswordResetToken,
   markPasswordResetTokenUsed,
@@ -417,6 +418,53 @@ router.put('/theme', (req, res) => {
   } catch (error) {
     console.error('Theme update error:', error);
     res.status(500).json({ error: 'Failed to update theme' });
+  }
+});
+
+// DELETE /api/auth/account - Delete user account (requires password verification)
+router.delete('/account', async (req, res) => {
+  try {
+    const sessionToken = req.cookies?.session_token;
+
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = validateSession(sessionToken);
+
+    if (!user) {
+      res.clearCookie('session_token', { path: '/' });
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required to delete account' });
+    }
+
+    // Verify password
+    const userWithPassword = findUserByIdWithPassword(user.id);
+    const isValid = await verifyPassword(password, userWithPassword.password_hash);
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+
+    // Delete the user and all associated data
+    const deleted = deleteUser(user.id);
+
+    if (!deleted) {
+      return res.status(500).json({ error: 'Failed to delete account' });
+    }
+
+    // Clear the session cookie
+    res.clearCookie('session_token', { path: '/' });
+
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 

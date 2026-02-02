@@ -164,6 +164,21 @@ export async function resetPassword(token, password) {
   return data;
 }
 
+export async function deleteAccount(password) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/account`, {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to delete account');
+  }
+
+  return data;
+}
+
 // ============ BOOKS API ============
 
 export async function scanISBN(isbn) {
