@@ -10,7 +10,7 @@ import EditSeriesModal from './EditSeriesModal';
 import { scanISBN, getBooks, searchAndAddBook, deleteBook, updateBook, resendVerificationEmail } from '../services/api';
 
 export default function Library() {
-  const { user } = useAuth();
+  const { user, setViewMode: saveViewMode } = useAuth();
   const [books, setBooks] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -20,13 +20,20 @@ export default function Library() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState(user?.viewMode || 'list'); // 'grid' or 'list'
   const [resendingVerification, setResendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState(null);
 
   useEffect(() => {
     loadBooks();
   }, []);
+
+  // Sync view mode from user when it changes (e.g., on login)
+  useEffect(() => {
+    if (user?.viewMode) {
+      setViewMode(user.viewMode);
+    }
+  }, [user?.viewMode]);
 
   const handleResendVerification = async () => {
     setResendingVerification(true);
@@ -356,7 +363,10 @@ export default function Library() {
             {/* View toggle */}
             <div className="flex items-center gap-1 bg-theme-card rounded-md shadow-sm p-1">
               <button
-                onClick={() => setViewMode('grid')}
+                onClick={() => {
+                  setViewMode('grid');
+                  saveViewMode('grid');
+                }}
                 className={`p-2 rounded ${viewMode === 'grid' ? 'bg-theme-secondary text-theme-secondary' : 'text-theme-muted hover:text-theme-primary'}`}
                 title="Grid view"
               >
@@ -365,7 +375,10 @@ export default function Library() {
                 </svg>
               </button>
               <button
-                onClick={() => setViewMode('list')}
+                onClick={() => {
+                  setViewMode('list');
+                  saveViewMode('list');
+                }}
                 className={`p-2 rounded ${viewMode === 'list' ? 'bg-theme-secondary text-theme-secondary' : 'text-theme-muted hover:text-theme-primary'}`}
                 title="List view"
               >

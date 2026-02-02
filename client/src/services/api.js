@@ -216,6 +216,21 @@ export async function resendVerificationEmail() {
   return data;
 }
 
+export async function updateViewMode(viewMode) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/view-mode`, {
+    method: 'PUT',
+    body: JSON.stringify({ viewMode }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update view mode');
+  }
+
+  return data;
+}
+
 // ============ BOOKS API ============
 
 export async function scanISBN(isbn) {

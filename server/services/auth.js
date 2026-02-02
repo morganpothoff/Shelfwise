@@ -63,7 +63,7 @@ export function validateSession(token) {
   if (!token) return null;
 
   const session = db.prepare(`
-    SELECT s.*, u.id as user_id, u.email, u.name, u.theme, u.email_verified
+    SELECT s.*, u.id as user_id, u.email, u.name, u.theme, u.email_verified, u.view_mode
     FROM sessions s
     JOIN users u ON s.user_id = u.id
     WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -76,6 +76,7 @@ export function validateSession(token) {
     email: session.email,
     name: session.name,
     theme: session.theme || 'purple',
+    viewMode: session.view_mode || 'list',
     emailVerified: !!session.email_verified
   };
 }
@@ -147,10 +148,11 @@ export function findUserByEmail(email) {
  * @returns {object|null} User object without password_hash, or null
  */
 export function findUserById(id) {
-  const user = db.prepare('SELECT id, email, name, theme, email_verified, created_at FROM users WHERE id = ?').get(id);
+  const user = db.prepare('SELECT id, email, name, theme, view_mode, email_verified, created_at FROM users WHERE id = ?').get(id);
   if (!user) return null;
   return {
     ...user,
+    viewMode: user.view_mode || 'list',
     emailVerified: !!user.email_verified
   };
 }
@@ -380,6 +382,23 @@ export function updateUserTheme(userId, theme) {
 }
 
 /**
+ * Update user's view mode preference
+ * @param {number} userId - User ID
+ * @param {string} viewMode - View mode ('grid', 'list')
+ * @returns {object} Updated user object
+ */
+export function updateUserViewMode(userId, viewMode) {
+  const validModes = ['grid', 'list'];
+  if (!validModes.includes(viewMode)) {
+    throw new Error('Invalid view mode');
+  }
+
+  db.prepare('UPDATE users SET view_mode = ? WHERE id = ?').run(viewMode, userId);
+
+  return findUserById(userId);
+}
+
+/**
  * Delete a user account and all associated data
  * @param {number} userId - User ID to delete
  */
@@ -415,6 +434,7 @@ export default {
   updateUserProfile,
   updateUserEmail,
   updateUserTheme,
+  updateUserViewMode,
   deleteUser,
   createPasswordResetToken,
   validatePasswordResetToken,

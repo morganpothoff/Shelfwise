@@ -11,6 +11,7 @@ import {
   updateUserProfile,
   updateUserEmail,
   updateUserTheme,
+  updateUserViewMode,
   deleteUser,
   createPasswordResetToken,
   validatePasswordResetToken,
@@ -99,6 +100,7 @@ router.post('/register', async (req, res) => {
         email: user.email,
         name: user.name,
         theme: user.theme,
+        viewMode: 'list',
         emailVerified: false
       },
       message: 'Account created! Please check your email to verify your account.'
@@ -143,6 +145,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         name: user.name,
         theme: user.theme || 'purple',
+        viewMode: user.view_mode || 'list',
         emailVerified: !!user.email_verified
       }
     });
@@ -221,6 +224,7 @@ router.put('/profile', async (req, res) => {
         email: updatedUser.email,
         name: updatedUser.name,
         theme: updatedUser.theme,
+        viewMode: updatedUser.viewMode,
         emailVerified: updatedUser.emailVerified
       }
     });
@@ -286,6 +290,7 @@ router.put('/email', async (req, res) => {
         email: updatedUser.email,
         name: updatedUser.name,
         theme: updatedUser.theme,
+        viewMode: updatedUser.viewMode,
         emailVerified: updatedUser.emailVerified
       },
       message: 'Email updated. Please check your new email to verify it. Other sessions have been logged out.'
@@ -433,12 +438,58 @@ router.put('/theme', (req, res) => {
         email: updatedUser.email,
         name: updatedUser.name,
         theme: updatedUser.theme,
+        viewMode: updatedUser.viewMode,
         emailVerified: updatedUser.emailVerified
       }
     });
   } catch (error) {
     console.error('Theme update error:', error);
     res.status(500).json({ error: 'Failed to update theme' });
+  }
+});
+
+// PUT /api/auth/view-mode - Update user's view mode preference
+router.put('/view-mode', (req, res) => {
+  try {
+    const sessionToken = req.cookies?.session_token;
+
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = validateSession(sessionToken);
+
+    if (!user) {
+      res.clearCookie('session_token', { path: '/' });
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    const { viewMode } = req.body;
+
+    if (!viewMode) {
+      return res.status(400).json({ error: 'View mode is required' });
+    }
+
+    const validModes = ['grid', 'list'];
+    if (!validModes.includes(viewMode)) {
+      return res.status(400).json({ error: 'Invalid view mode. Must be grid or list' });
+    }
+
+    const updatedUser = updateUserViewMode(user.id, viewMode);
+
+    res.json({
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        theme: updatedUser.theme,
+        viewMode: updatedUser.viewMode,
+        emailVerified: updatedUser.emailVerified
+      }
+    });
+  } catch (error) {
+    console.error('View mode update error:', error);
+    res.status(500).json({ error: 'Failed to update view mode' });
   }
 });
 
@@ -465,6 +516,7 @@ router.post('/verify-email', (req, res) => {
         email: user.email,
         name: user.name,
         theme: user.theme,
+        viewMode: user.viewMode,
         emailVerified: user.emailVerified
       }
     });

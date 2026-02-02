@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser, updateTheme as apiUpdateTheme, updateProfile as apiUpdateProfile, updateEmail as apiUpdateEmail, deleteAccount as apiDeleteAccount } from '../services/api';
+import { login as apiLogin, register as apiRegister, logout as apiLogout, getCurrentUser, updateTheme as apiUpdateTheme, updateProfile as apiUpdateProfile, updateEmail as apiUpdateEmail, deleteAccount as apiDeleteAccount, updateViewMode as apiUpdateViewMode } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -121,6 +121,17 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function setViewMode(viewMode) {
+    try {
+      const data = await apiUpdateViewMode(viewMode);
+      setUser(data.user);
+      return { success: true };
+    } catch (err) {
+      console.error('View mode update error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   function clearError() {
     setError(null);
   }
@@ -145,6 +156,7 @@ export function AuthProvider({ children }) {
     register,
     logout,
     setTheme,
+    setViewMode,
     updateProfile,
     updateEmail,
     deleteAccount,
