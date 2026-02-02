@@ -7,7 +7,7 @@ import ManualBookForm from './ManualBookForm';
 import BookCard from './BookCard';
 import BookListItem from './BookListItem';
 import EditSeriesModal from './EditSeriesModal';
-import { scanISBN, getBooks, searchAndAddBook, deleteBook, updateBook } from '../services/api';
+import { scanISBN, getBooks, searchAndAddBook, deleteBook, updateBook, resendVerificationEmail } from '../services/api';
 
 export default function Library() {
   const { user } = useAuth();
@@ -21,10 +21,25 @@ export default function Library() {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState(null);
 
   useEffect(() => {
     loadBooks();
   }, []);
+
+  const handleResendVerification = async () => {
+    setResendingVerification(true);
+    setVerificationMessage(null);
+    try {
+      const result = await resendVerificationEmail();
+      setVerificationMessage({ type: 'success', text: result.message });
+    } catch (err) {
+      setVerificationMessage({ type: 'error', text: err.message });
+    } finally {
+      setResendingVerification(false);
+    }
+  };
 
   const loadBooks = async () => {
     try {
@@ -245,6 +260,38 @@ export default function Library() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto py-6 px-4">
+        {/* Email verification banner */}
+        {user && !user.emailVerified && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-yellow-800">Verify your email address</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Please check your inbox for a verification email and click the link to verify your account.
+                  {user.email && <span className="font-medium"> ({user.email})</span>}
+                </p>
+                {verificationMessage && (
+                  <p className={`text-sm mt-2 ${verificationMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
+                    {verificationMessage.text}
+                  </p>
+                )}
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resendingVerification}
+                  className="mt-3 text-sm font-medium text-yellow-800 hover:text-yellow-900 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resendingVerification ? 'Sending...' : 'Resend verification email'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex flex-wrap gap-4 mb-6">
           <button

@@ -14,7 +14,7 @@ async function fetchWithCredentials(url, options = {}) {
   // Handle 401 - redirect to login if session expired
   if (response.status === 401) {
     // Only redirect if we're not already on an auth page
-    const authPages = ['/login', '/register', '/forgot-password', '/reset-password'];
+    const authPages = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
     const isAuthPage = authPages.some(page => window.location.pathname.startsWith(page));
     if (!isAuthPage) {
       window.location.href = '/login';
@@ -174,6 +174,43 @@ export async function deleteAccount(password) {
 
   if (!response.ok) {
     throw new Error(data.error || 'Failed to delete account');
+  }
+
+  return data;
+}
+
+export async function verifyEmail(token) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/verify-email`, {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to verify email');
+  }
+
+  return data;
+}
+
+export async function validateVerificationToken(token) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/validate-verification-token?token=${encodeURIComponent(token)}`);
+
+  const data = await response.json();
+
+  return data;
+}
+
+export async function resendVerificationEmail() {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/resend-verification`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to resend verification email');
   }
 
   return data;

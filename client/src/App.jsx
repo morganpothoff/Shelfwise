@@ -4,6 +4,7 @@ import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
+import VerifyEmailPage from './components/VerifyEmailPage';
 import Library from './components/Library';
 import UserProfile from './components/UserProfile';
 import FAQPage from './components/FAQPage';
@@ -84,6 +85,10 @@ function App() {
       <Route
         path="/reset-password"
         element={<ResetPasswordPage />}
+      />
+      <Route
+        path="/verify-email"
+        element={<VerifyEmailPage />}
       />
       <Route
         path="/"

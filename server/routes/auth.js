@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createUser,
   findUserByEmail,
+  findUserById,
   findUserByIdWithPassword,
   verifyPassword,
   createSession,
@@ -14,9 +15,12 @@ import {
   createPasswordResetToken,
   validatePasswordResetToken,
   markPasswordResetTokenUsed,
-  resetPassword
+  resetPassword,
+  createEmailVerificationToken,
+  validateEmailVerificationToken,
+  verifyEmail
 } from '../services/auth.js';
-import { sendPasswordResetEmail } from '../services/email.js';
+import { sendPasswordResetEmail, sendEmailVerificationEmail } from '../services/email.js';
 
 const router = Router();
 
@@ -75,6 +79,14 @@ router.post('/register', async (req, res) => {
     // Create user
     const user = await createUser(email, password, name);
 
+    // Create email verification token and send verification email
+    const verificationToken = createEmailVerificationToken(user.id, email);
+    const emailResult = await sendEmailVerificationEmail(email, verificationToken, name);
+
+    if (!emailResult.success) {
+      console.error('Failed to send verification email:', emailResult.error);
+    }
+
     // Create session
     const session = createSession(user.id, rememberMe || false);
 
@@ -88,7 +100,8 @@ router.post('/register', async (req, res) => {
         name: user.name,
         theme: user.theme,
         emailVerified: false
-      }
+      },
+      message: 'Account created! Please check your email to verify your account.'
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -256,8 +269,16 @@ router.put('/email', async (req, res) => {
       return res.status(401).json({ error: 'Incorrect password' });
     }
 
-    // Update email (will invalidate other sessions)
+    // Update email (will invalidate other sessions and reset email_verified to false)
     const updatedUser = updateUserEmail(user.id, email, sessionToken);
+
+    // Send verification email for the new email address
+    const verificationToken = createEmailVerificationToken(updatedUser.id, email);
+    const emailResult = await sendEmailVerificationEmail(email, verificationToken, updatedUser.name);
+
+    if (!emailResult.success) {
+      console.error('Failed to send verification email:', emailResult.error);
+    }
 
     res.json({
       user: {
@@ -267,7 +288,7 @@ router.put('/email', async (req, res) => {
         theme: updatedUser.theme,
         emailVerified: updatedUser.emailVerified
       },
-      message: 'Email updated successfully. Other sessions have been logged out.'
+      message: 'Email updated. Please check your new email to verify it. Other sessions have been logged out.'
     });
   } catch (error) {
     console.error('Email update error:', error);
@@ -418,6 +439,100 @@ router.put('/theme', (req, res) => {
   } catch (error) {
     console.error('Theme update error:', error);
     res.status(500).json({ error: 'Failed to update theme' });
+  }
+});
+
+// POST /api/auth/verify-email - Verify email with token
+router.post('/verify-email', (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required' });
+    }
+
+    // Verify the email
+    const user = verifyEmail(token);
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired verification link. Please request a new one.' });
+    }
+
+    res.json({
+      message: 'Email verified successfully!',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        theme: user.theme,
+        emailVerified: user.emailVerified
+      }
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
+// GET /api/auth/validate-verification-token - Check if verification token is valid
+router.get('/validate-verification-token', (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ valid: false, error: 'Token is required' });
+    }
+
+    const tokenData = validateEmailVerificationToken(token);
+
+    if (!tokenData) {
+      return res.json({ valid: false, error: 'Invalid or expired verification link' });
+    }
+
+    res.json({ valid: true, email: tokenData.email });
+  } catch (error) {
+    console.error('Validate verification token error:', error);
+    res.status(500).json({ valid: false, error: 'Failed to validate token' });
+  }
+});
+
+// POST /api/auth/resend-verification - Resend verification email
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const sessionToken = req.cookies?.session_token;
+
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = validateSession(sessionToken);
+
+    if (!user) {
+      res.clearCookie('session_token', { path: '/' });
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    // Check if already verified
+    if (user.emailVerified) {
+      return res.status(400).json({ error: 'Email is already verified' });
+    }
+
+    // Get full user data
+    const fullUser = findUserById(user.id);
+
+    // Create new verification token and send email
+    const verificationToken = createEmailVerificationToken(user.id, user.email);
+    const emailResult = await sendEmailVerificationEmail(user.email, verificationToken, fullUser.name);
+
+    if (!emailResult.success) {
+      console.error('Failed to send verification email:', emailResult.error);
+      return res.status(500).json({ error: 'Failed to send verification email' });
+    }
+
+    res.json({ message: 'Verification email sent! Please check your inbox.' });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'Failed to resend verification email' });
   }
 });
 

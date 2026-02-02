@@ -212,6 +212,9 @@ export function findUserByIdWithPassword(userId) {
 // Password reset token duration (1 hour)
 const PASSWORD_RESET_DURATION = 60 * 60 * 1000;
 
+// Email verification token duration (24 hours)
+const EMAIL_VERIFICATION_DURATION = 24 * 60 * 60 * 1000;
+
 /**
  * Create a password reset token for a user
  * @param {number} userId - User ID
@@ -287,6 +290,79 @@ export function cleanExpiredPasswordResetTokens() {
 }
 
 /**
+ * Create an email verification token for a user
+ * @param {number} userId - User ID
+ * @param {string} email - Email address to verify
+ * @returns {string} The verification token
+ */
+export function createEmailVerificationToken(userId, email) {
+  // Invalidate any existing unused tokens for this user
+  db.prepare('UPDATE email_verification_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(userId);
+
+  const token = uuidv4();
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_DURATION);
+
+  db.prepare(`
+    INSERT INTO email_verification_tokens (user_id, email, token, expires_at)
+    VALUES (?, ?, ?, ?)
+  `).run(userId, email.toLowerCase().trim(), token, expiresAt.toISOString());
+
+  return token;
+}
+
+/**
+ * Validate an email verification token and return the associated user info
+ * @param {string} token - The verification token
+ * @returns {object|null} Object with user and email info if valid, null otherwise
+ */
+export function validateEmailVerificationToken(token) {
+  if (!token) return null;
+
+  const verificationToken = db.prepare(`
+    SELECT evt.*, u.id as user_id, u.email as current_email, u.name
+    FROM email_verification_tokens evt
+    JOIN users u ON evt.user_id = u.id
+    WHERE evt.token = ? AND evt.used = 0 AND evt.expires_at > datetime('now')
+  `).get(token);
+
+  if (!verificationToken) return null;
+
+  return {
+    id: verificationToken.user_id,
+    email: verificationToken.email,
+    currentEmail: verificationToken.current_email,
+    name: verificationToken.name,
+    tokenId: verificationToken.id
+  };
+}
+
+/**
+ * Verify a user's email and mark the token as used
+ * @param {string} token - The verification token
+ * @returns {object|null} Updated user object if successful, null otherwise
+ */
+export function verifyEmail(token) {
+  const tokenData = validateEmailVerificationToken(token);
+  if (!tokenData) return null;
+
+  // Mark the token as used
+  db.prepare('UPDATE email_verification_tokens SET used = 1 WHERE token = ?').run(token);
+
+  // Update the user's email_verified status
+  db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(tokenData.id);
+
+  return findUserById(tokenData.id);
+}
+
+/**
+ * Clean up expired email verification tokens
+ */
+export function cleanExpiredEmailVerificationTokens() {
+  const result = db.prepare("DELETE FROM email_verification_tokens WHERE expires_at <= datetime('now') OR used = 1").run();
+  return result.changes;
+}
+
+/**
  * Update user's theme preference
  * @param {number} userId - User ID
  * @param {string} theme - Theme name ('purple', 'light', 'dark')
@@ -345,6 +421,10 @@ export default {
   markPasswordResetTokenUsed,
   resetPassword,
   cleanExpiredPasswordResetTokens,
+  createEmailVerificationToken,
+  validateEmailVerificationToken,
+  verifyEmail,
+  cleanExpiredEmailVerificationTokens,
   SESSION_DURATION_DEFAULT,
   SESSION_DURATION_REMEMBER
 };

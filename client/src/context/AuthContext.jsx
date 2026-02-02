@@ -125,6 +125,18 @@ export function AuthProvider({ children }) {
     setError(null);
   }
 
+  // Refresh user data (useful after email verification)
+  async function refreshUser() {
+    try {
+      const data = await getCurrentUser();
+      setUser(data.user);
+      return { success: true };
+    } catch (err) {
+      console.error('Refresh user error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   const value = {
     user,
     loading,
@@ -136,6 +148,7 @@ export function AuthProvider({ children }) {
     updateProfile,
     updateEmail,
     deleteAccount,
+    refreshUser,
     clearError,
     isAuthenticated: !!user
   };
