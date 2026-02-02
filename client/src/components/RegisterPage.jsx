@@ -173,11 +173,14 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Decorative elements */}
-        <div className="mt-8 text-center">
+        {/* Footer links */}
+        <div className="mt-8 text-center space-y-2">
           <p className="text-theme-muted text-sm">
             Organize your books, discover your next read
           </p>
+          <Link to="/faq" className="text-theme-secondary hover:underline text-sm">
+            Frequently Asked Questions
+          </Link>
         </div>
       </div>
     </div>

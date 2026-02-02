@@ -1,31 +1,52 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import Navbar from './Navbar';
 import ISBNScanner from './ISBNScanner';
 import ManualISBNEntry from './ManualISBNEntry';
 import ManualBookForm from './ManualBookForm';
 import BookCard from './BookCard';
 import BookListItem from './BookListItem';
 import EditSeriesModal from './EditSeriesModal';
-import ThemeSelector from './ThemeSelector';
-import { scanISBN, getBooks, searchAndAddBook, deleteBook, updateBook } from '../services/api';
+import { scanISBN, getBooks, searchAndAddBook, deleteBook, updateBook, resendVerificationEmail } from '../services/api';
 
 export default function Library() {
-  const { user, logout, setTheme } = useAuth();
+  const { user, setViewMode: saveViewMode } = useAuth();
   const [books, setBooks] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [showManualBookForm, setShowManualBookForm] = useState(false);
-  const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [manualFormISBN, setManualFormISBN] = useState(null);
   const [editingSeriesBook, setEditingSeriesBook] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState(user?.viewMode || 'list'); // 'grid' or 'list'
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState(null);
 
   useEffect(() => {
     loadBooks();
   }, []);
+
+  // Sync view mode from user when it changes (e.g., on login)
+  useEffect(() => {
+    if (user?.viewMode) {
+      setViewMode(user.viewMode);
+    }
+  }, [user?.viewMode]);
+
+  const handleResendVerification = async () => {
+    setResendingVerification(true);
+    setVerificationMessage(null);
+    try {
+      const result = await resendVerificationEmail();
+      setVerificationMessage({ type: 'success', text: result.message });
+    } catch (err) {
+      setVerificationMessage({ type: 'error', text: err.message });
+    } finally {
+      setResendingVerification(false);
+    }
+  };
 
   const loadBooks = async () => {
     try {
@@ -147,15 +168,6 @@ export default function Library() {
     setManualFormISBN(null);
   };
 
-  const handleLogout = async () => {
-    await logout();
-  };
-
-  const handleThemeChange = async (newTheme) => {
-    await setTheme(newTheme);
-    setShowThemeSelector(false);
-  };
-
   const renderGridView = () => (
     <div className="space-y-8">
       {/* Series groups */}
@@ -252,42 +264,41 @@ export default function Library() {
 
   return (
     <div className="min-h-screen bg-theme-primary">
-      <header className="bg-theme-card shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-theme-primary">Shelfwise</h1>
-            <p className="text-theme-muted">Your Personal Library Manager</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {user && (
-              <span className="text-theme-muted hidden sm:inline">
-                Welcome, <span className="font-medium text-theme-primary">{user.name || user.email}</span>
-              </span>
-            )}
-            {/* Theme button */}
-            <button
-              onClick={() => setShowThemeSelector(true)}
-              className="p-2 text-theme-muted hover:text-theme-primary rounded-md hover:bg-theme-secondary transition-colors"
-              title="Change theme"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clipRule="evenodd" />
-              </svg>
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-theme-muted hover:text-theme-primary px-3 py-2 rounded-md hover:bg-theme-secondary transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7zm-3 1a1 1 0 10-2 0v3a1 1 0 102 0V8zM8 9a1 1 0 00-2 0v2a1 1 0 102 0V9z" clipRule="evenodd" />
-              </svg>
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="max-w-7xl mx-auto py-6 px-4">
+        {/* Email verification banner */}
+        {user && !user.emailVerified && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-yellow-800">Verify your email address</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Please check your inbox for a verification email and click the link to verify your account.
+                  {user.email && <span className="font-medium"> ({user.email})</span>}
+                </p>
+                {verificationMessage && (
+                  <p className={`text-sm mt-2 ${verificationMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
+                    {verificationMessage.text}
+                  </p>
+                )}
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resendingVerification}
+                  className="mt-3 text-sm font-medium text-yellow-800 hover:text-yellow-900 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resendingVerification ? 'Sending...' : 'Resend verification email'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex flex-wrap gap-4 mb-6">
           <button
@@ -352,7 +363,10 @@ export default function Library() {
             {/* View toggle */}
             <div className="flex items-center gap-1 bg-theme-card rounded-md shadow-sm p-1">
               <button
-                onClick={() => setViewMode('grid')}
+                onClick={() => {
+                  setViewMode('grid');
+                  saveViewMode('grid');
+                }}
                 className={`p-2 rounded ${viewMode === 'grid' ? 'bg-theme-secondary text-theme-secondary' : 'text-theme-muted hover:text-theme-primary'}`}
                 title="Grid view"
               >
@@ -361,7 +375,10 @@ export default function Library() {
                 </svg>
               </button>
               <button
-                onClick={() => setViewMode('list')}
+                onClick={() => {
+                  setViewMode('list');
+                  saveViewMode('list');
+                }}
                 className={`p-2 rounded ${viewMode === 'list' ? 'bg-theme-secondary text-theme-secondary' : 'text-theme-muted hover:text-theme-primary'}`}
                 title="List view"
               >
@@ -416,14 +433,6 @@ export default function Library() {
           book={editingSeriesBook}
           onSave={handleSaveSeries}
           onClose={() => setEditingSeriesBook(null)}
-        />
-      )}
-
-      {showThemeSelector && (
-        <ThemeSelector
-          currentTheme={user?.theme || 'purple'}
-          onSelect={handleThemeChange}
-          onClose={() => setShowThemeSelector(false)}
         />
       )}
     </div>

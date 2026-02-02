@@ -2,7 +2,13 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
+import VerifyEmailPage from './components/VerifyEmailPage';
 import Library from './components/Library';
+import UserProfile from './components/UserProfile';
+import FAQPage from './components/FAQPage';
+import QuizPage from './components/QuizPage';
 
 // Loading spinner component
 function LoadingScreen() {
@@ -69,10 +75,43 @@ function App() {
         }
       />
       <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPasswordPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={<ResetPasswordPage />}
+      />
+      <Route
+        path="/verify-email"
+        element={<VerifyEmailPage />}
+      />
+      <Route
         path="/"
         element={
           <ProtectedRoute>
             <Library />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <UserProfile />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/faq" element={<FAQPage />} />
+      <Route
+        path="/quiz"
+        element={
+          <ProtectedRoute>
+            <QuizPage />
           </ProtectedRoute>
         }
       />

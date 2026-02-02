@@ -14,8 +14,9 @@ async function fetchWithCredentials(url, options = {}) {
   // Handle 401 - redirect to login if session expired
   if (response.status === 401) {
     // Only redirect if we're not already on an auth page
-    if (!window.location.pathname.startsWith('/login') &&
-        !window.location.pathname.startsWith('/register')) {
+    const authPages = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
+    const isAuthPage = authPages.some(page => window.location.pathname.startsWith(page));
+    if (!isAuthPage) {
       window.location.href = '/login';
     }
   }
@@ -90,6 +91,141 @@ export async function updateTheme(theme) {
 
   if (!response.ok) {
     throw new Error(data.error || 'Failed to update theme');
+  }
+
+  return data;
+}
+
+export async function updateProfile(updates) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/profile`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update profile');
+  }
+
+  return data;
+}
+
+export async function updateEmail(email, password) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/email`, {
+    method: 'PUT',
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update email');
+  }
+
+  return data;
+}
+
+export async function forgotPassword(email) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/forgot-password`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to send reset email');
+  }
+
+  return data;
+}
+
+export async function validateResetToken(token) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/validate-reset-token?token=${encodeURIComponent(token)}`);
+
+  const data = await response.json();
+
+  return data;
+}
+
+export async function resetPassword(token, password) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to reset password');
+  }
+
+  return data;
+}
+
+export async function deleteAccount(password) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/account`, {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to delete account');
+  }
+
+  return data;
+}
+
+export async function verifyEmail(token) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/verify-email`, {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to verify email');
+  }
+
+  return data;
+}
+
+export async function validateVerificationToken(token) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/validate-verification-token?token=${encodeURIComponent(token)}`);
+
+  const data = await response.json();
+
+  return data;
+}
+
+export async function resendVerificationEmail() {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/resend-verification`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to resend verification email');
+  }
+
+  return data;
+}
+
+export async function updateViewMode(viewMode) {
+  const response = await fetchWithCredentials(`${API_BASE}/auth/view-mode`, {
+    method: 'PUT',
+    body: JSON.stringify({ viewMode }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update view mode');
   }
 
   return data;
