@@ -26,10 +26,11 @@ function handleError(res, error, publicMessage) {
   res.status(500).json({ error: isProduction ? publicMessage : error.message });
 }
 
-// GET /api/books - List all books
+// GET /api/books - List all books for the authenticated user
 router.get('/', (req, res) => {
   try {
-    const books = db.prepare('SELECT * FROM books ORDER BY created_at DESC').all();
+    const userId = req.user.id;
+    const books = db.prepare('SELECT * FROM books WHERE user_id = ? ORDER BY created_at DESC').all(userId);
     // Parse tags JSON for each book
     const parsedBooks = books.map(book => ({
       ...book,
@@ -41,25 +42,27 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET /api/books/series/list - Get all unique series names (must be before /:id)
+// GET /api/books/series/list - Get all unique series names for the authenticated user (must be before /:id)
 router.get('/series/list', (req, res) => {
   try {
+    const userId = req.user.id;
     const series = db.prepare(`
       SELECT DISTINCT series_name
       FROM books
-      WHERE series_name IS NOT NULL AND series_name != ''
+      WHERE user_id = ? AND series_name IS NOT NULL AND series_name != ''
       ORDER BY series_name
-    `).all();
+    `).all(userId);
     res.json(series.map(s => s.series_name));
   } catch (error) {
     handleError(res, error, 'Failed to fetch series');
   }
 });
 
-// GET /api/books/:id - Get single book
+// GET /api/books/:id - Get single book (only if owned by authenticated user)
 router.get('/:id', validateIdParam, (req, res) => {
   try {
-    const book = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
+    const userId = req.user.id;
+    const book = db.prepare('SELECT * FROM books WHERE id = ? AND user_id = ?').get(req.params.id, userId);
     if (!book) {
       return res.status(404).json({ error: 'Book not found' });
     }
@@ -73,6 +76,7 @@ router.get('/:id', validateIdParam, (req, res) => {
 // POST /api/books - Add book manually
 router.post('/', validateBook, (req, res) => {
   try {
+    const userId = req.user.id;
     const { isbn, title, author, page_count, genre, synopsis, tags } = req.body;
 
     if (!title) {
@@ -80,11 +84,12 @@ router.post('/', validateBook, (req, res) => {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO books (isbn, title, author, page_count, genre, synopsis, tags)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO books (user_id, isbn, title, author, page_count, genre, synopsis, tags)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
+      userId,
       isbn || null,
       title,
       author || null,
@@ -106,6 +111,7 @@ router.post('/', validateBook, (req, res) => {
 // POST /api/books/search - Search and add book by title/author
 router.post('/search', validateSearch, async (req, res) => {
   try {
+    const userId = req.user.id;
     const { title, author, isbn } = req.body;
 
     // Search for book data from external APIs
@@ -113,11 +119,12 @@ router.post('/search', validateSearch, async (req, res) => {
 
     // Insert the book into the database
     const stmt = db.prepare(`
-      INSERT INTO books (isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO books (user_id, isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
+      userId,
       bookData.isbn,
       bookData.title,
       bookData.author,
@@ -145,13 +152,14 @@ router.post('/search', validateSearch, async (req, res) => {
 // POST /api/books/scan - Add book via ISBN scan
 router.post('/scan', validateISBNScan, async (req, res) => {
   try {
+    const userId = req.user.id;
     const { isbn } = req.body;
 
     // Clean the ISBN
     const cleanIsbn = isbn.replace(/[-\s]/g, '');
 
-    // Check if book already exists
-    const existingBook = db.prepare('SELECT * FROM books WHERE isbn = ?').get(cleanIsbn);
+    // Check if book already exists for this user
+    const existingBook = db.prepare('SELECT * FROM books WHERE isbn = ? AND user_id = ?').get(cleanIsbn, userId);
     if (existingBook) {
       existingBook.tags = existingBook.tags ? JSON.parse(existingBook.tags) : [];
       return res.status(200).json({
@@ -174,11 +182,12 @@ router.post('/scan', validateISBNScan, async (req, res) => {
 
     // Insert the book into the database
     const stmt = db.prepare(`
-      INSERT INTO books (isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO books (user_id, isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
+      userId,
       bookData.isbn,
       bookData.title,
       bookData.author,
@@ -203,13 +212,14 @@ router.post('/scan', validateISBNScan, async (req, res) => {
   }
 });
 
-// PUT /api/books/:id - Update book
+// PUT /api/books/:id - Update book (only if owned by authenticated user)
 router.put('/:id', validateIdParam, validateBook, (req, res) => {
   try {
+    const userId = req.user.id;
     const { title, author, page_count, genre, synopsis, tags, series_name, series_position } = req.body;
     const bookId = req.params.id;
 
-    const existing = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId);
+    const existing = db.prepare('SELECT * FROM books WHERE id = ? AND user_id = ?').get(bookId, userId);
     if (!existing) {
       return res.status(404).json({ error: 'Book not found' });
     }
@@ -218,7 +228,7 @@ router.put('/:id', validateIdParam, validateBook, (req, res) => {
       UPDATE books
       SET title = ?, author = ?, page_count = ?, genre = ?, synopsis = ?, tags = ?,
           series_name = ?, series_position = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE id = ? AND user_id = ?
     `);
 
     stmt.run(
@@ -230,7 +240,8 @@ router.put('/:id', validateIdParam, validateBook, (req, res) => {
       Array.isArray(tags) ? JSON.stringify(tags) : tags ?? existing.tags,
       series_name !== undefined ? series_name : existing.series_name,
       series_position !== undefined ? series_position : existing.series_position,
-      bookId
+      bookId,
+      userId
     );
 
     const updatedBook = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId);
@@ -242,10 +253,11 @@ router.put('/:id', validateIdParam, validateBook, (req, res) => {
   }
 });
 
-// DELETE /api/books/:id - Delete book
+// DELETE /api/books/:id - Delete book (only if owned by authenticated user)
 router.delete('/:id', validateIdParam, (req, res) => {
   try {
-    const result = db.prepare('DELETE FROM books WHERE id = ?').run(req.params.id);
+    const userId = req.user.id;
+    const result = db.prepare('DELETE FROM books WHERE id = ? AND user_id = ?').run(req.params.id, userId);
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Book not found' });
     }
