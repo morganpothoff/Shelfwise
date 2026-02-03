@@ -283,8 +283,13 @@ export async function searchAndAddBook(title, author, isbn = null) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to add book');
+    const errorData = await response.json();
+    const error = new Error(errorData.error || 'Failed to add book');
+    // Include additional context for ISBN not found errors
+    error.isbnNotFound = response.status === 404 && errorData.error === 'ISBN not found';
+    error.title = errorData.title;
+    error.author = errorData.author;
+    throw error;
   }
 
   return response.json();

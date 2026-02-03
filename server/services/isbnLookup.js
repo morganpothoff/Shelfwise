@@ -72,8 +72,69 @@ export async function lookupISBN(isbn) {
 }
 
 /**
+ * Check if two author strings are similar enough to be considered a match.
+ * Handles cases like "J.K. Rowling" vs "Rowling, J.K." or "Stephen King" vs "King, Stephen"
+ */
+function authorsMatch(requestedAuthor, foundAuthor) {
+  if (!requestedAuthor || !foundAuthor) return false;
+
+  // Normalize: lowercase, remove punctuation, normalize whitespace
+  const normalize = (str) => str
+    .toLowerCase()
+    .replace(/[.,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const requested = normalize(requestedAuthor);
+  const found = normalize(foundAuthor);
+
+  // Exact match after normalization
+  if (requested === found) return true;
+
+  // Extract individual name parts (handles "First Last" and "Last, First" formats)
+  const getNameParts = (name) => {
+    return name.split(/[\s,]+/).filter(part => part.length > 0);
+  };
+
+  const requestedParts = getNameParts(requested);
+  const foundParts = getNameParts(found);
+
+  // Check if all requested name parts appear in the found author
+  // This handles cases like searching "Rowling" matching "J K Rowling"
+  const allRequestedPartsFound = requestedParts.every(reqPart =>
+    foundParts.some(foundPart =>
+      foundPart.includes(reqPart) || reqPart.includes(foundPart)
+    )
+  );
+
+  if (allRequestedPartsFound && requestedParts.length > 0) return true;
+
+  // Check if the last name matches (usually the most important part)
+  // Last name is typically the last part, or the first part if comma-separated
+  const getLastName = (parts, original) => {
+    if (original.includes(',')) {
+      return parts[0]; // "Last, First" format
+    }
+    return parts[parts.length - 1]; // "First Last" format
+  };
+
+  const requestedLastName = getLastName(requestedParts, requested);
+  const foundLastName = getLastName(foundParts, found);
+
+  if (requestedLastName && foundLastName &&
+      (requestedLastName === foundLastName ||
+       requestedLastName.includes(foundLastName) ||
+       foundLastName.includes(requestedLastName))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Search for a book by title and author
  * Merges data from search results with ISBN lookup for complete metadata
+ * Only returns results if the found author matches the requested author
  */
 export async function searchByTitleAuthor(title, author, isbn = null) {
   // Try Open Library search first
@@ -82,27 +143,53 @@ export async function searchByTitleAuthor(title, author, isbn = null) {
   // Try Google Books search as well
   const googleBooksData = await searchGoogleBooks(title, author);
 
-  // Determine the best ISBN to use
-  const foundIsbn = isbn || openLibraryData?.isbn || googleBooksData?.isbn;
+  // Filter results to only include those with matching authors
+  const openLibraryMatch = openLibraryData && authorsMatch(author, openLibraryData.author)
+    ? openLibraryData : null;
+  const googleBooksMatch = googleBooksData && authorsMatch(author, googleBooksData.author)
+    ? googleBooksData : null;
+
+  // Determine the best ISBN to use (only from matching results)
+  const foundIsbn = isbn || openLibraryMatch?.isbn || googleBooksMatch?.isbn;
 
   // If we have an ISBN, try to get additional data via ISBN lookup
   let isbnLookupData = null;
   if (foundIsbn) {
     isbnLookupData = await lookupISBN(foundIsbn);
+
+    // Verify the ISBN lookup result also matches the author
+    if (isbnLookupData && !authorsMatch(author, isbnLookupData.author)) {
+      isbnLookupData = null;
+    }
+  }
+
+  // If no matching results found, return with no ISBN
+  if (!openLibraryMatch && !googleBooksMatch && !isbnLookupData) {
+    return {
+      isbn: null,
+      title: title,
+      author: author,
+      page_count: null,
+      genre: '',
+      synopsis: '',
+      tags: '[]',
+      series_name: null,
+      series_position: null
+    };
   }
 
   // Merge all available data, prioritizing more complete sources
   // Priority: ISBN lookup data > Open Library search > Google Books search
   const mergedData = {
     isbn: foundIsbn,
-    title: isbnLookupData?.title || openLibraryData?.title || googleBooksData?.title || title,
-    author: isbnLookupData?.author || openLibraryData?.author || googleBooksData?.author || author,
-    page_count: isbnLookupData?.page_count || openLibraryData?.page_count || googleBooksData?.page_count || null,
-    genre: isbnLookupData?.genre || openLibraryData?.genre || googleBooksData?.genre || '',
-    synopsis: isbnLookupData?.synopsis || openLibraryData?.synopsis || googleBooksData?.synopsis || '',
-    tags: isbnLookupData?.tags || openLibraryData?.tags || googleBooksData?.tags || '[]',
-    series_name: isbnLookupData?.series_name || openLibraryData?.series_name || googleBooksData?.series_name || null,
-    series_position: isbnLookupData?.series_position ?? openLibraryData?.series_position ?? googleBooksData?.series_position ?? null
+    title: isbnLookupData?.title || openLibraryMatch?.title || googleBooksMatch?.title || title,
+    author: isbnLookupData?.author || openLibraryMatch?.author || googleBooksMatch?.author || author,
+    page_count: isbnLookupData?.page_count || openLibraryMatch?.page_count || googleBooksMatch?.page_count || null,
+    genre: isbnLookupData?.genre || openLibraryMatch?.genre || googleBooksMatch?.genre || '',
+    synopsis: isbnLookupData?.synopsis || openLibraryMatch?.synopsis || googleBooksMatch?.synopsis || '',
+    tags: isbnLookupData?.tags || openLibraryMatch?.tags || googleBooksMatch?.tags || '[]',
+    series_name: isbnLookupData?.series_name || openLibraryMatch?.series_name || googleBooksMatch?.series_name || null,
+    series_position: isbnLookupData?.series_position ?? openLibraryMatch?.series_position ?? googleBooksMatch?.series_position ?? null
   };
 
   return mergedData;

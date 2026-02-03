@@ -7,7 +7,7 @@ import ManualBookForm from './ManualBookForm';
 import BookCard from './BookCard';
 import BookListItem from './BookListItem';
 import EditSeriesModal from './EditSeriesModal';
-import { scanISBN, getBooks, searchAndAddBook, deleteBook, updateBook, resendVerificationEmail } from '../services/api';
+import { scanISBN, getBooks, searchAndAddBook, addBook, deleteBook, updateBook, resendVerificationEmail } from '../services/api';
 
 export default function Library() {
   const { user, setViewMode: saveViewMode } = useAuth();
@@ -24,6 +24,7 @@ export default function Library() {
   const [resendingVerification, setResendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isbnNotFoundBook, setIsbnNotFoundBook] = useState(null);
 
   useEffect(() => {
     loadBooks();
@@ -146,6 +147,30 @@ export default function Library() {
       setBooks(prev => [result.book, ...prev]);
       setManualFormISBN(null);
       setMessage('Book added successfully!');
+    } catch (err) {
+      if (err.isbnNotFound) {
+        // Show confirmation popup to add without ISBN
+        setIsbnNotFoundBook({ title: err.title || title, author: err.author || author });
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddBookWithoutISBN = async () => {
+    if (!isbnNotFoundBook) return;
+
+    const { title, author } = isbnNotFoundBook;
+    setIsbnNotFoundBook(null);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const newBook = await addBook({ title, author });
+      setBooks(prev => [newBook, ...prev]);
+      setMessage('Book added successfully (without ISBN metadata)');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -500,6 +525,56 @@ export default function Library() {
           onSave={handleSaveSeries}
           onClose={() => setEditingSeriesBook(null)}
         />
+      )}
+
+      {isbnNotFoundBook && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-theme-card rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-theme-primary">ISBN Not Found</h2>
+                <p className="text-sm text-theme-secondary mt-1">
+                  We couldn't find an ISBN for this book. Would you like to add it anyway without additional metadata?
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-theme-secondary rounded-md p-3 mb-4">
+              <p className="text-sm text-theme-primary">
+                <span className="font-medium">{isbnNotFoundBook.title}</span>
+                {isbnNotFoundBook.author && (
+                  <span className="text-theme-muted"> by {isbnNotFoundBook.author}</span>
+                )}
+              </p>
+            </div>
+
+            <p className="text-xs text-theme-muted mb-4">
+              The book will be added with just the title and author. You won't have page count, synopsis, genre, or series information.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsbnNotFoundBook(null)}
+                className="flex-1 px-4 py-2 border border-theme rounded-md text-theme-primary hover:bg-theme-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddBookWithoutISBN}
+                className="flex-1 px-4 py-2 bg-theme-accent bg-theme-accent-hover text-theme-on-primary rounded-md"
+              >
+                Add Anyway
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
