@@ -75,7 +75,7 @@ export function validateSession(token) {
     id: session.user_id,
     email: session.email,
     name: session.name,
-    theme: session.theme || 'purple',
+    theme: session.theme || 'blue',
     viewMode: session.view_mode || 'list',
     emailVerified: !!session.email_verified
   };
@@ -120,7 +120,7 @@ export async function createUser(email, password, name) {
 
   const stmt = db.prepare(`
     INSERT INTO users (email, password_hash, name, theme)
-    VALUES (?, ?, ?, 'purple')
+    VALUES (?, ?, ?, 'blue')
   `);
 
   const result = stmt.run(email.toLowerCase().trim(), passwordHash, name?.trim() || null);
@@ -129,7 +129,7 @@ export async function createUser(email, password, name) {
     id: result.lastInsertRowid,
     email: email.toLowerCase().trim(),
     name: name?.trim() || null,
-    theme: 'purple'
+    theme: 'blue'
   };
 }
 
@@ -367,11 +367,11 @@ export function cleanExpiredEmailVerificationTokens() {
 /**
  * Update user's theme preference
  * @param {number} userId - User ID
- * @param {string} theme - Theme name ('purple', 'light', 'dark')
+ * @param {string} theme - Theme name ('blue', 'purple', 'light', 'dark')
  * @returns {object} Updated user object
  */
 export function updateUserTheme(userId, theme) {
-  const validThemes = ['purple', 'light', 'dark'];
+  const validThemes = ['blue', 'purple', 'light', 'dark'];
   if (!validThemes.includes(theme)) {
     throw new Error('Invalid theme');
   }

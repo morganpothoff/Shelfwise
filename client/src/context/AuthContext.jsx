@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
 
   function applyTheme(theme) {
     // Remove all theme classes
-    document.documentElement.classList.remove('theme-purple', 'theme-light', 'theme-dark');
+    document.documentElement.classList.remove('theme-blue', 'theme-purple', 'theme-light', 'theme-dark');
     // Add the new theme class
     document.documentElement.classList.add(`theme-${theme}`);
   }
@@ -73,7 +73,7 @@ export function AuthProvider({ children }) {
     }
     setUser(null);
     // Remove theme class on logout
-    document.documentElement.classList.remove('theme-purple', 'theme-light', 'theme-dark');
+    document.documentElement.classList.remove('theme-blue', 'theme-purple', 'theme-light', 'theme-dark');
   }
 
   async function setTheme(theme) {
@@ -113,7 +113,7 @@ export function AuthProvider({ children }) {
     try {
       await apiDeleteAccount(password);
       setUser(null);
-      document.documentElement.classList.remove('theme-purple', 'theme-light', 'theme-dark');
+      document.documentElement.classList.remove('theme-blue', 'theme-purple', 'theme-light', 'theme-dark');
       return { success: true };
     } catch (err) {
       console.error('Account deletion error:', err);

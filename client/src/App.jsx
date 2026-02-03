@@ -9,6 +9,7 @@ import Library from './components/Library';
 import UserProfile from './components/UserProfile';
 import FAQPage from './components/FAQPage';
 import QuizPage from './components/QuizPage';
+import BookProfile from './components/BookProfile';
 
 // Loading spinner component
 function LoadingScreen() {
@@ -107,6 +108,14 @@ function App() {
         }
       />
       <Route path="/faq" element={<FAQPage />} />
+      <Route
+        path="/book/:id"
+        element={
+          <ProtectedRoute>
+            <BookProfile />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/quiz"
         element={

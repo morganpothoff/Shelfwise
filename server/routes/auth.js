@@ -144,7 +144,7 @@ router.post('/login', async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        theme: user.theme || 'purple',
+        theme: user.theme || 'blue',
         viewMode: user.view_mode || 'list',
         emailVerified: !!user.email_verified
       }
@@ -425,9 +425,9 @@ router.put('/theme', (req, res) => {
       return res.status(400).json({ error: 'Theme is required' });
     }
 
-    const validThemes = ['purple', 'light', 'dark'];
+    const validThemes = ['blue', 'purple', 'light', 'dark'];
     if (!validThemes.includes(theme)) {
-      return res.status(400).json({ error: 'Invalid theme. Must be purple, light, or dark' });
+      return res.status(400).json({ error: 'Invalid theme. Must be blue, purple, light, or dark' });
     }
 
     const updatedUser = updateUserTheme(user.id, theme);

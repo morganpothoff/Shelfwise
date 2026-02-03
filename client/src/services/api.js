@@ -326,3 +326,54 @@ export async function getSeriesList() {
 
   return response.json();
 }
+
+export async function getBook(id) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/${id}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch book');
+  }
+
+  return response.json();
+}
+
+// ============ BOOK RATINGS API ============
+
+export async function getBookRating(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/${bookId}/rating`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch rating');
+  }
+
+  return response.json();
+}
+
+export async function saveBookRating(bookId, rating, comment = null) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/${bookId}/rating`, {
+    method: 'POST',
+    body: JSON.stringify({ rating, comment }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to save rating');
+  }
+
+  return response.json();
+}
+
+export async function deleteBookRating(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/${bookId}/rating`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete rating');
+  }
+
+  return response.json();
+}
