@@ -47,6 +47,10 @@ const faqs = [
       {
         question: 'Can I add a book that doesn\'t have an ISBN?',
         answer: `Yes! Use the "Enter ISBN" button, then when prompted, click the option to add manually by title and author.`
+      },
+      {
+        question: 'Why is my book not being recognized as part of a seris when I import it?',
+        answer: `While we try to identify if a book is a part of a series upon import, the APIs we use do not always contain this information. However, you may add this information to the book(s) after import!`
       }
     ]
   },
@@ -60,6 +64,10 @@ const faqs = [
       {
         question: 'How do I rate a book?',
         answer: `Open the book's profile page by clicking on its title, then scroll down to the "Your Rating" section. Click "Add Rating" to give the book 1-5 stars and optionally add comments about your thoughts on the book. You can edit or delete your rating at any time.`
+      },
+      {
+        question: 'How do I mark a book as read?',
+        answer: `Open the book's profile page by clicking on its title, then look for the "Reading Status" section. You can set the status to "Unread", "Reading", or "Read". When marking a book as read, you can optionally add the date you finished it.`
       },
       {
         question: 'How do I delete a book from my library?',
@@ -76,6 +84,71 @@ const faqs = [
       {
         question: 'Can I switch between grid and list view?',
         answer: `Yes! Use the toggle button in the top right corner of your library to switch between Grid view (shows cover art) and List view (compact text format).`
+      }
+    ]
+  },
+  {
+    category: 'Import & Export',
+    questions: [
+      {
+        question: 'How do I import books from another app or spreadsheet?',
+        answer: `Click the "Import Books" button on your library page. You can import books from JSON, CSV, or Excel (.xlsx/.xls) files. The import process has three steps:
+
+1. Upload your file - drag and drop or browse to select
+2. Shelfwise searches for each book by title and author to find its ISBN, then fetches full metadata (synopsis, page count, series info) - just like when you scan a book
+3. Review the results - books found are imported with complete metadata, while books that couldn't be found can be added with only basic info from your file or skipped
+
+You can also export a list of skipped books for later reference.`
+      },
+      {
+        question: 'What file formats are supported for import?',
+        answer: `Shelfwise supports three import formats:
+• JSON - Either an array of books or an object with a "books" array
+• CSV - Comma-separated values with a header row
+• Excel - Both .xlsx and .xls formats are supported`
+      },
+      {
+        question: 'What fields can I include in my import file?',
+        answer: `Your import file should include at least a "title" field. Other recognized fields include:
+• title (or book_title, name)
+• author (or authors, book_author)
+• isbn (or isbn13, isbn_13, isbn10, isbn_10)
+• page_count (or pages, num_pages, number_of_pages)
+• genre (or genres, category)
+• synopsis (or description, summary)
+• tags - comma or semicolon separated
+• series_name (or series)
+• series_position (or series_number, book_number)
+• reading_status - "read", "reading", or "unread"
+• date_finished (or date_read, finished_date, read_date, date_completed)`
+      },
+      {
+        question: 'Can I import my reading history with dates?',
+        answer: `Yes! Include a "reading_status" column set to "read" and a "date_finished" column with the date you finished reading. Dates can be in most common formats (YYYY-MM-DD, MM/DD/YYYY, etc.). If you include a date_finished without setting reading_status, the book will automatically be marked as "read".`
+      },
+      {
+        question: 'What happens to duplicate books during import?',
+        answer: `Shelfwise checks for duplicates by ISBN OR by matching title and author. If a book in your import file matches an existing book in your library (by either method), it will be skipped. The same applies if the ISBN lookup finds a book that's already in your library. You can see which books are duplicates in the review screen.`
+      },
+      {
+        question: 'What if some books aren\'t found during import?',
+        answer: `During the review step, you'll see a list of books where no ISBN could be found. For each one, you can choose to:
+• Add it anyway - The book will be added with ONLY the basic info from your import file (title, author, etc.) without additional metadata
+• Skip it - The book won't be imported
+
+You can use "Add all" or "Skip all" to quickly process the entire list. There's also an "Export Skipped" button to download a CSV of all skipped books so you can track what wasn't imported.`
+      },
+      {
+        question: 'How do I export my library?',
+        answer: `Click the "Export" button next to the view toggle in your library. You can choose between two export types:
+• Comprehensive - Includes all book data (synopsis, tags, genres, reading status, dates)
+• Minimal - Just ISBN, title, author, and series info
+
+Both types can be exported as JSON or CSV files.`
+      },
+      {
+        question: 'Can I import from Goodreads?',
+        answer: `Yes! Export your Goodreads library as a CSV file, then import it into Shelfwise. The importer recognizes common Goodreads field names like "Title", "Author", "ISBN13", and "Date Read". Note that you may need to adjust some fields manually after import.`
       }
     ]
   },
