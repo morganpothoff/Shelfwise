@@ -1,6 +1,16 @@
 export default function ThemeSelector({ currentTheme, onSelect, onClose }) {
   const themes = [
     {
+      id: 'blue',
+      name: 'Whimsical Blue',
+      description: 'Playful and inviting',
+      preview: {
+        bg: 'bg-blue-100',
+        accent: 'bg-blue-500',
+        text: 'text-blue-900'
+      }
+    },
+    {
       id: 'purple',
       name: 'Purple Dream',
       description: 'Elegant purple tones',

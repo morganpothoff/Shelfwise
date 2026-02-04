@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosition }) {
   const handleDelete = () => {
     if (window.confirm(`Remove "${book.title}" from your library?`)) {
@@ -34,7 +36,9 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
             {Number.isInteger(book.series_position) ? book.series_position : book.series_position.toFixed(1)}
           </span>
         )}
-        <h3 className="text-lg font-semibold text-theme-primary pr-12">{book.title}</h3>
+        <Link to={`/book/${book.id}`} className="text-lg font-semibold text-theme-primary pr-12 hover:text-theme-accent transition-colors">
+          {book.title}
+        </Link>
       </div>
 
       {book.author && (

@@ -283,8 +283,13 @@ export async function searchAndAddBook(title, author, isbn = null) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to add book');
+    const errorData = await response.json();
+    const error = new Error(errorData.error || 'Failed to add book');
+    // Include additional context for ISBN not found errors
+    error.isbnNotFound = response.status === 404 && errorData.error === 'ISBN not found';
+    error.title = errorData.title;
+    error.author = errorData.author;
+    throw error;
   }
 
   return response.json();
@@ -322,6 +327,57 @@ export async function getSeriesList() {
 
   if (!response.ok) {
     throw new Error('Failed to fetch series');
+  }
+
+  return response.json();
+}
+
+export async function getBook(id) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/${id}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch book');
+  }
+
+  return response.json();
+}
+
+// ============ BOOK RATINGS API ============
+
+export async function getBookRating(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/${bookId}/rating`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch rating');
+  }
+
+  return response.json();
+}
+
+export async function saveBookRating(bookId, rating, comment = null) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/${bookId}/rating`, {
+    method: 'POST',
+    body: JSON.stringify({ rating, comment }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to save rating');
+  }
+
+  return response.json();
+}
+
+export async function deleteBookRating(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/${bookId}/rating`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete rating');
   }
 
   return response.json();

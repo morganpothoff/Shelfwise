@@ -109,13 +109,43 @@ router.post('/', validateBook, (req, res) => {
 });
 
 // POST /api/books/search - Search and add book by title/author
+// Requires finding an ISBN before adding - book is added as if scanned by ISBN
 router.post('/search', validateSearch, async (req, res) => {
   try {
     const userId = req.user.id;
     const { title, author, isbn } = req.body;
 
-    // Search for book data from external APIs
-    const bookData = await searchByTitleAuthor(title, author, isbn);
+    // Search for book data from external APIs to find an ISBN
+    const searchData = await searchByTitleAuthor(title, author, isbn);
+
+    // ISBN is required - if not found, return an error
+    if (!searchData.isbn) {
+      return res.status(404).json({
+        error: 'ISBN not found',
+        message: 'Could not find an ISBN for this book. Please try a different title/author or add using an ISBN directly.',
+        title,
+        author
+      });
+    }
+
+    const foundIsbn = searchData.isbn;
+
+    // Check if book already exists for this user (same as ISBN scan flow)
+    const existingBook = db.prepare('SELECT * FROM books WHERE isbn = ? AND user_id = ?').get(foundIsbn, userId);
+    if (existingBook) {
+      existingBook.tags = existingBook.tags ? JSON.parse(existingBook.tags) : [];
+      return res.status(200).json({
+        book: existingBook,
+        message: 'Book already exists in library',
+        isExisting: true
+      });
+    }
+
+    // Look up complete book data using the found ISBN (same as ISBN scan flow)
+    const bookData = await lookupISBN(foundIsbn);
+
+    // Use the ISBN lookup data, falling back to search data if lookup fails
+    const finalData = bookData || searchData;
 
     // Insert the book into the database
     const stmt = db.prepare(`
@@ -125,15 +155,15 @@ router.post('/search', validateSearch, async (req, res) => {
 
     const result = stmt.run(
       userId,
-      bookData.isbn,
-      bookData.title,
-      bookData.author,
-      bookData.page_count,
-      bookData.genre,
-      bookData.synopsis,
-      bookData.tags,
-      bookData.series_name,
-      bookData.series_position
+      foundIsbn,
+      finalData.title,
+      finalData.author,
+      finalData.page_count,
+      finalData.genre,
+      finalData.synopsis,
+      finalData.tags,
+      finalData.series_name,
+      finalData.series_position
     );
 
     const newBook = db.prepare('SELECT * FROM books WHERE id = ?').get(result.lastInsertRowid);
@@ -264,6 +294,98 @@ router.delete('/:id', validateIdParam, (req, res) => {
     res.json({ message: 'Book deleted successfully' });
   } catch (error) {
     handleError(res, error, 'Failed to delete book');
+  }
+});
+
+// ============ BOOK RATINGS ============
+
+// GET /api/books/:id/rating - Get rating for a book (only the authenticated user's rating)
+router.get('/:id/rating', validateIdParam, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookId = req.params.id;
+
+    // Verify the book belongs to the user
+    const book = db.prepare('SELECT id FROM books WHERE id = ? AND user_id = ?').get(bookId, userId);
+    if (!book) {
+      return res.status(404).json({ error: 'Book not found' });
+    }
+
+    const rating = db.prepare('SELECT * FROM book_ratings WHERE book_id = ? AND user_id = ?').get(bookId, userId);
+    res.json(rating || null);
+  } catch (error) {
+    handleError(res, error, 'Failed to fetch rating');
+  }
+});
+
+// POST /api/books/:id/rating - Create or update rating for a book
+router.post('/:id/rating', validateIdParam, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookId = req.params.id;
+    const { rating, comment } = req.body;
+
+    // Validate rating
+    if (!rating || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
+      return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
+    }
+
+    // Validate comment length
+    if (comment && comment.length > 5000) {
+      return res.status(400).json({ error: 'Comment must be less than 5000 characters' });
+    }
+
+    // Verify the book belongs to the user
+    const book = db.prepare('SELECT id FROM books WHERE id = ? AND user_id = ?').get(bookId, userId);
+    if (!book) {
+      return res.status(404).json({ error: 'Book not found' });
+    }
+
+    // Check if rating already exists
+    const existingRating = db.prepare('SELECT id FROM book_ratings WHERE book_id = ? AND user_id = ?').get(bookId, userId);
+
+    if (existingRating) {
+      // Update existing rating
+      db.prepare(`
+        UPDATE book_ratings
+        SET rating = ?, comment = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE book_id = ? AND user_id = ?
+      `).run(rating, comment || null, bookId, userId);
+    } else {
+      // Create new rating
+      db.prepare(`
+        INSERT INTO book_ratings (book_id, user_id, rating, comment)
+        VALUES (?, ?, ?, ?)
+      `).run(bookId, userId, rating, comment || null);
+    }
+
+    const savedRating = db.prepare('SELECT * FROM book_ratings WHERE book_id = ? AND user_id = ?').get(bookId, userId);
+    res.status(existingRating ? 200 : 201).json(savedRating);
+  } catch (error) {
+    handleError(res, error, 'Failed to save rating');
+  }
+});
+
+// DELETE /api/books/:id/rating - Delete rating for a book
+router.delete('/:id/rating', validateIdParam, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookId = req.params.id;
+
+    // Verify the book belongs to the user
+    const book = db.prepare('SELECT id FROM books WHERE id = ? AND user_id = ?').get(bookId, userId);
+    if (!book) {
+      return res.status(404).json({ error: 'Book not found' });
+    }
+
+    const result = db.prepare('DELETE FROM book_ratings WHERE book_id = ? AND user_id = ?').run(bookId, userId);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Rating not found' });
+    }
+
+    res.json({ message: 'Rating deleted successfully' });
+  } catch (error) {
+    handleError(res, error, 'Failed to delete rating');
   }
 });
 

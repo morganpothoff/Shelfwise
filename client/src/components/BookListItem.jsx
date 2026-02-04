@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function BookListItem({ book, onDelete, onEditSeries, showSeriesPosition }) {
   const handleDelete = () => {
     if (window.confirm(`Remove "${book.title}" from your library?`)) {
@@ -14,7 +16,9 @@ export default function BookListItem({ book, onDelete, onEditSeries, showSeriesP
           </span>
         )}
         <div className="min-w-0">
-          <span className="font-medium text-theme-primary">{book.title}</span>
+          <Link to={`/book/${book.id}`} className="font-medium text-theme-primary hover:text-theme-accent transition-colors">
+            {book.title}
+          </Link>
           {book.author && (
             <span className="text-theme-muted ml-2">by {book.author}</span>
           )}

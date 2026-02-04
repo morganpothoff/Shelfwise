@@ -54,6 +54,14 @@ const faqs = [
     category: 'Managing Your Library',
     questions: [
       {
+        question: 'How do I view more details about a book?',
+        answer: `Click on any book's title in your library to open its detailed profile page. The book profile shows all information including the full synopsis, tags, series information, and more.`
+      },
+      {
+        question: 'How do I rate a book?',
+        answer: `Open the book's profile page by clicking on its title, then scroll down to the "Your Rating" section. Click "Add Rating" to give the book 1-5 stars and optionally add comments about your thoughts on the book. You can edit or delete your rating at any time.`
+      },
+      {
         question: 'How do I delete a book from my library?',
         answer: `Hover over the book you want to remove and click the trash icon that appears. The book will be permanently removed from your library.`
       },
