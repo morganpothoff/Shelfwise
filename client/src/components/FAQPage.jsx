@@ -47,6 +47,10 @@ const faqs = [
       {
         question: 'Can I add a book that doesn\'t have an ISBN?',
         answer: `Yes! Use the "Enter ISBN" button, then when prompted, click the option to add manually by title and author.`
+      },
+      {
+        question: 'Why is my book not being recognized as part of a seris when I import it?',
+        answer: `While we try to identify if a book is a part of a series upon import, the APIs we use do not always contain this information. However, you may add this information to the book(s) after import!`
       }
     ]
   },
