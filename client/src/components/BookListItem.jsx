@@ -15,12 +15,21 @@ export default function BookListItem({ book, onDelete, onEditSeries, showSeriesP
             {Number.isInteger(book.series_position) ? book.series_position : book.series_position.toFixed(1)}
           </span>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 flex items-center gap-2">
           <Link to={`/book/${book.id}`} className="font-medium text-theme-primary hover:text-theme-accent transition-colors">
             {book.title}
           </Link>
+          {book.reading_status && book.reading_status !== 'unread' && (
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
+              book.reading_status === 'read'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-blue-100 text-blue-800'
+            }`}>
+              {book.reading_status === 'read' ? '✓' : '📖'}
+            </span>
+          )}
           {book.author && (
-            <span className="text-theme-muted ml-2">by {book.author}</span>
+            <span className="text-theme-muted">by {book.author}</span>
           )}
         </div>
       </div>

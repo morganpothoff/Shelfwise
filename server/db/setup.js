@@ -42,6 +42,8 @@ db.exec(`
     tags TEXT,
     series_name TEXT,
     series_position REAL,
+    reading_status TEXT DEFAULT 'unread',
+    date_finished DATE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

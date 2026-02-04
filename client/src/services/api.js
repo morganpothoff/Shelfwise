@@ -382,3 +382,127 @@ export async function deleteBookRating(bookId) {
 
   return response.json();
 }
+
+// ============ EXPORT API ============
+
+export async function exportBooks(type = 'comprehensive', format = 'json') {
+  const response = await fetchWithCredentials(
+    `${API_BASE}/books/export?type=${encodeURIComponent(type)}&format=${encodeURIComponent(format)}`
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to export books');
+  }
+
+  // Get the filename from Content-Disposition header or generate one
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `shelfwise-library-${type}-${new Date().toISOString().split('T')[0]}.${format}`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="(.+)"/);
+    if (match) {
+      filename = match[1];
+    }
+  }
+
+  // Get the blob for download
+  const blob = await response.blob();
+
+  // Trigger download
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+
+  return { success: true, filename };
+}
+
+// ============ IMPORT API ============
+
+// Step 1: Parse and lookup - returns books categorized by found/notFound/duplicates
+export async function parseImportFile(file) {
+  const format = getFileFormat(file.name);
+
+  let data;
+  if (format === 'xlsx' || format === 'xls') {
+    data = await readFileAsBase64(file);
+  } else {
+    data = await readFileAsText(file);
+  }
+
+  const response = await fetchWithCredentials(`${API_BASE}/books/import/parse`, {
+    method: 'POST',
+    body: JSON.stringify({ data, format }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Failed to parse import file');
+  }
+
+  return result;
+}
+
+// Step 2: Confirm and import selected books
+export async function confirmImport(booksToImport) {
+  const response = await fetchWithCredentials(`${API_BASE}/books/import/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ booksToImport }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Failed to import books');
+  }
+
+  return result;
+}
+
+// Helper to download data as a file
+export function downloadAsFile(data, filename, type = 'application/json') {
+  const blob = new Blob([data], { type });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
+
+function getFileFormat(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  if (ext === 'json') return 'json';
+  if (ext === 'csv') return 'csv';
+  if (ext === 'xlsx') return 'xlsx';
+  if (ext === 'xls') return 'xls';
+  throw new Error('Unsupported file format. Please use JSON, CSV, or Excel (.xlsx/.xls) files.');
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsText(file);
+  });
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}

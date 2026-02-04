@@ -7,7 +7,8 @@ import ManualBookForm from './ManualBookForm';
 import BookCard from './BookCard';
 import BookListItem from './BookListItem';
 import EditSeriesModal from './EditSeriesModal';
-import { scanISBN, getBooks, searchAndAddBook, addBook, deleteBook, updateBook, resendVerificationEmail } from '../services/api';
+import ImportBooksModal from './ImportBooksModal';
+import { scanISBN, getBooks, searchAndAddBook, addBook, deleteBook, updateBook, resendVerificationEmail, exportBooks } from '../services/api';
 
 export default function Library() {
   const { user, setViewMode: saveViewMode } = useAuth();
@@ -25,6 +26,9 @@ export default function Library() {
   const [verificationMessage, setVerificationMessage] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isbnNotFoundBook, setIsbnNotFoundBook] = useState(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     loadBooks();
@@ -210,6 +214,22 @@ export default function Library() {
     setManualFormISBN(null);
   };
 
+  const handleExport = async (type, format) => {
+    setShowExportMenu(false);
+    setExporting(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await exportBooks(type, format);
+      setMessage(`Library exported successfully (${type} ${format.toUpperCase()})`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const renderGridView = () => (
     <div className="space-y-8">
       {/* Series groups */}
@@ -374,6 +394,15 @@ export default function Library() {
             </svg>
             Add Manually
           </button>
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 bg-theme-card text-theme-secondary border border-theme px-4 py-2 rounded-md hover:bg-theme-secondary transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+            </svg>
+            Import Books
+          </button>
         </div>
 
         {/* Search bar */}
@@ -437,32 +466,125 @@ export default function Library() {
               My Library ({searchQuery ? `${filteredBooks.length} of ${books.length}` : books.length} books)
             </h2>
 
-            {/* View toggle */}
-            <div className="flex items-center gap-1 bg-theme-card rounded-md shadow-sm p-1">
-              <button
-                onClick={() => {
-                  setViewMode('grid');
-                  saveViewMode('grid');
-                }}
-                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-theme-secondary text-theme-secondary' : 'text-theme-muted hover:text-theme-primary'}`}
-                title="Grid view"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('list');
-                  saveViewMode('list');
-                }}
-                className={`p-2 rounded ${viewMode === 'list' ? 'bg-theme-secondary text-theme-secondary' : 'text-theme-muted hover:text-theme-primary'}`}
-                title="List view"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
-              </button>
+            <div className="flex items-center gap-3">
+              {/* Export dropdown */}
+              {books.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    disabled={exporting}
+                    className="flex items-center gap-2 px-3 py-2 bg-theme-card rounded-md shadow-sm text-theme-primary hover:bg-theme-secondary transition-colors disabled:opacity-50"
+                    title="Export library"
+                  >
+                    {exporting ? (
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className="text-sm font-medium">Export</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+
+                  {showExportMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowExportMenu(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-64 bg-theme-card rounded-md shadow-lg border border-theme z-20">
+                        <div className="p-2">
+                          <p className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                            Comprehensive Export
+                          </p>
+                          <p className="px-3 pb-2 text-xs text-theme-muted">
+                            All book data including synopsis, genre, tags, and dates
+                          </p>
+                          <button
+                            onClick={() => handleExport('comprehensive', 'json')}
+                            className="w-full text-left px-3 py-2 text-sm text-theme-primary hover:bg-theme-secondary rounded-md flex items-center gap-2"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-theme-muted" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                            Export as JSON
+                          </button>
+                          <button
+                            onClick={() => handleExport('comprehensive', 'csv')}
+                            className="w-full text-left px-3 py-2 text-sm text-theme-primary hover:bg-theme-secondary rounded-md flex items-center gap-2"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-theme-muted" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+                            </svg>
+                            Export as CSV
+                          </button>
+                        </div>
+
+                        <div className="border-t border-theme p-2">
+                          <p className="px-3 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wider">
+                            Minimal Export
+                          </p>
+                          <p className="px-3 pb-2 text-xs text-theme-muted">
+                            ISBN, title, author, and series info only
+                          </p>
+                          <button
+                            onClick={() => handleExport('minimal', 'json')}
+                            className="w-full text-left px-3 py-2 text-sm text-theme-primary hover:bg-theme-secondary rounded-md flex items-center gap-2"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-theme-muted" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                            Export as JSON
+                          </button>
+                          <button
+                            onClick={() => handleExport('minimal', 'csv')}
+                            className="w-full text-left px-3 py-2 text-sm text-theme-primary hover:bg-theme-secondary rounded-md flex items-center gap-2"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-theme-muted" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+                            </svg>
+                            Export as CSV
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* View toggle */}
+              <div className="flex items-center gap-1 bg-theme-card rounded-md shadow-sm p-1">
+                <button
+                  onClick={() => {
+                    setViewMode('grid');
+                    saveViewMode('grid');
+                  }}
+                  className={`p-2 rounded ${viewMode === 'grid' ? 'bg-theme-secondary text-theme-secondary' : 'text-theme-muted hover:text-theme-primary'}`}
+                  title="Grid view"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => {
+                    setViewMode('list');
+                    saveViewMode('list');
+                  }}
+                  className={`p-2 rounded ${viewMode === 'list' ? 'bg-theme-secondary text-theme-secondary' : 'text-theme-muted hover:text-theme-primary'}`}
+                  title="List view"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -524,6 +646,16 @@ export default function Library() {
           book={editingSeriesBook}
           onSave={handleSaveSeries}
           onClose={() => setEditingSeriesBook(null)}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportBooksModal
+          onClose={() => setShowImportModal(false)}
+          onImportComplete={(importedBooks) => {
+            setBooks(prev => [...importedBooks, ...prev]);
+            setMessage(`Successfully imported ${importedBooks.length} books!`);
+          }}
         />
       )}
 

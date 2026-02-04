@@ -56,6 +56,12 @@ export default function BookProfile() {
   const [showEditSeriesModal, setShowEditSeriesModal] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
 
+  // Reading status state
+  const [editingReadingStatus, setEditingReadingStatus] = useState(false);
+  const [readingStatus, setReadingStatus] = useState('unread');
+  const [dateFinished, setDateFinished] = useState('');
+  const [readingStatusLoading, setReadingStatusLoading] = useState(false);
+
   useEffect(() => {
     loadBook();
   }, [id]);
@@ -69,6 +75,8 @@ export default function BookProfile() {
         getBookRating(id).catch(() => null)
       ]);
       setBook(bookData);
+      setReadingStatus(bookData.reading_status || 'unread');
+      setDateFinished(bookData.date_finished || '');
       if (ratingData) {
         setUserRating(ratingData);
         setSelectedRating(ratingData.rating);
@@ -161,6 +169,40 @@ export default function BookProfile() {
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err) {
       setActionMessage({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleSaveReadingStatus = async () => {
+    try {
+      setReadingStatusLoading(true);
+      const updatedBook = await updateBook(id, {
+        reading_status: readingStatus,
+        date_finished: readingStatus === 'read' ? dateFinished || null : null
+      });
+      setBook(updatedBook);
+      setReadingStatus(updatedBook.reading_status || 'unread');
+      setDateFinished(updatedBook.date_finished || '');
+      setEditingReadingStatus(false);
+      setActionMessage({ type: 'success', text: 'Reading status updated' });
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err.message });
+    } finally {
+      setReadingStatusLoading(false);
+    }
+  };
+
+  const handleCancelReadingStatus = () => {
+    setEditingReadingStatus(false);
+    setReadingStatus(book.reading_status || 'unread');
+    setDateFinished(book.date_finished || '');
+  };
+
+  const getReadingStatusDisplay = (status) => {
+    switch (status) {
+      case 'read': return { label: 'Read', color: 'bg-green-100 text-green-800', icon: '✓' };
+      case 'reading': return { label: 'Currently Reading', color: 'bg-blue-100 text-blue-800', icon: '📖' };
+      default: return { label: 'Unread', color: 'bg-gray-100 text-gray-800', icon: '○' };
     }
   };
 
@@ -300,6 +342,86 @@ export default function BookProfile() {
                 <div className="bg-theme-secondary px-4 py-2 rounded-lg">
                   <span className="text-sm text-theme-muted">ISBN</span>
                   <p className="text-lg font-semibold text-theme-primary">{book.isbn}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Reading Status */}
+            <div className="border-t border-theme pt-6">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-theme-muted uppercase tracking-wide">Reading Status</h2>
+                {!editingReadingStatus && (
+                  <button
+                    onClick={() => setEditingReadingStatus(true)}
+                    className="text-sm text-theme-accent hover:underline"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {!editingReadingStatus ? (
+                <div className="flex items-center gap-4">
+                  <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${getReadingStatusDisplay(book.reading_status).color}`}>
+                    <span>{getReadingStatusDisplay(book.reading_status).icon}</span>
+                    {getReadingStatusDisplay(book.reading_status).label}
+                  </span>
+                  {book.reading_status === 'read' && book.date_finished && (
+                    <span className="text-sm text-theme-muted">
+                      Finished: {new Date(book.date_finished).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-theme-secondary p-4 rounded-lg">
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    {['unread', 'reading', 'read'].map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setReadingStatus(status)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          readingStatus === status
+                            ? 'bg-theme-accent text-theme-on-primary'
+                            : 'bg-theme-card text-theme-primary hover:bg-theme-accent/20'
+                        }`}
+                      >
+                        {getReadingStatusDisplay(status).icon} {getReadingStatusDisplay(status).label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {readingStatus === 'read' && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-theme-primary mb-1">
+                        Date Finished (optional)
+                      </label>
+                      <input
+                        type="date"
+                        value={dateFinished}
+                        onChange={(e) => setDateFinished(e.target.value)}
+                        max={new Date().toISOString().split('T')[0]}
+                        className="px-3 py-2 border border-theme rounded-lg bg-theme-card text-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-accent"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleSaveReadingStatus}
+                      disabled={readingStatusLoading}
+                      className="bg-theme-accent bg-theme-accent-hover text-theme-on-primary px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+                    >
+                      {readingStatusLoading ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={handleCancelReadingStatus}
+                      disabled={readingStatusLoading}
+                      className="text-theme-muted hover:text-theme-primary px-4 py-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
