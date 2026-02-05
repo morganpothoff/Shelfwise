@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import booksRouter from './routes/books.js';
+import completedBooksRouter from './routes/completedBooks.js';
 import authRouter from './routes/auth.js';
 import { requireAuth } from './middleware/auth.js';
 import { cleanExpiredSessions } from './services/auth.js';
@@ -68,15 +69,19 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/books/scan', scanLimiter);
 app.use('/api/books/search', scanLimiter);
+app.use('/api/completed-books/import', scanLimiter);
 
-// Body parsing with size limits
-app.use(express.json({ limit: '100kb' }));
+// Body parsing with size limits (500kb to support book imports)
+app.use(express.json({ limit: '500kb' }));
 
 // Routes - auth routes are public
 app.use('/api/auth', authRouter);
 
 // Books routes require authentication
 app.use('/api/books', requireAuth, booksRouter);
+
+// Completed books routes require authentication
+app.use('/api/completed-books', requireAuth, completedBooksRouter);
 
 // Health check (public)
 app.get('/api/health', (req, res) => {

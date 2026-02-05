@@ -11,6 +11,7 @@
     "db:setup": "node server/db/setup.js",
     "db:migrate": "node server/db/migrate.js",
     "db:migrate-auth": "node server/db/migrate-auth.js",
+    "db:migrate-completed": "node server/db/migrate-completed-books.js",
     "build": "cd client && npm run build",
     "start": "NODE_ENV=production node server/index.js"
   },

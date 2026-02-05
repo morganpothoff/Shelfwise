@@ -190,3 +190,108 @@ export async function getSeriesList() {
 
   return response.json();
 }
+
+// ============ COMPLETED BOOKS API ============
+
+export async function getCompletedBooks() {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch completed books');
+  }
+
+  return response.json();
+}
+
+export async function getCompletedBook(id) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${id}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch completed book');
+  }
+
+  return response.json();
+}
+
+export async function addCompletedBook(bookData) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books`, {
+    method: 'POST',
+    body: JSON.stringify(bookData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to add completed book');
+  }
+
+  return response.json();
+}
+
+export async function updateCompletedBook(id, updates) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update completed book');
+  }
+
+  return response.json();
+}
+
+export async function deleteCompletedBook(id) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${id}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete completed book');
+  }
+
+  return response.json();
+}
+
+export async function addCompletedBookToLibrary(id) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${id}/add-to-library`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to add book to library');
+  }
+
+  return response.json();
+}
+
+export async function importCompletedBooks(books) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/import`, {
+    method: 'POST',
+    body: JSON.stringify({ books }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to import books');
+  }
+
+  return response.json();
+}
+
+export async function addManualReviewBook(bookData) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/import/manual`, {
+    method: 'POST',
+    body: JSON.stringify(bookData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to add book from manual review');
+  }
+
+  return response.json();
+}

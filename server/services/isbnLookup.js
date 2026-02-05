@@ -3,6 +3,138 @@
  * Uses Open Library API and Google Books API to fetch book metadata
  */
 
+/**
+ * Search for an English version ISBN given a title and author
+ * This is used during import to find English editions of books
+ * @param {string} title - Book title
+ * @param {string} author - Book author
+ * @returns {string|null} - English ISBN-13 or ISBN-10 if found
+ */
+export async function searchEnglishISBN(title, author) {
+  // Try Open Library first - it has good language metadata
+  const openLibraryIsbn = await searchOpenLibraryEnglishISBN(title, author);
+  if (openLibraryIsbn) {
+    return openLibraryIsbn;
+  }
+
+  // Fallback to Google Books
+  const googleBooksIsbn = await searchGoogleBooksEnglishISBN(title, author);
+  if (googleBooksIsbn) {
+    return googleBooksIsbn;
+  }
+
+  return null;
+}
+
+/**
+ * Search Open Library for an English ISBN
+ */
+async function searchOpenLibraryEnglishISBN(title, author) {
+  try {
+    // Search with language filter for English
+    const query = encodeURIComponent(`${title} ${author}`);
+    const response = await fetch(
+      `https://openlibrary.org/search.json?q=${query}&language=eng&limit=10`
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.docs || data.docs.length === 0) {
+      return null;
+    }
+
+    // Find the best match that has an ISBN and is in English
+    const normalizedTitle = title.toLowerCase().trim();
+
+    for (const doc of data.docs) {
+      const docTitle = (doc.title || '').toLowerCase();
+      const isTitleMatch = docTitle.includes(normalizedTitle) || normalizedTitle.includes(docTitle);
+
+      if (!isTitleMatch) continue;
+
+      // Check if it's an English edition
+      const languages = doc.language || [];
+      const isEnglish = languages.includes('eng') || languages.length === 0;
+
+      if (isEnglish && doc.isbn && doc.isbn.length > 0) {
+        // Prefer ISBN-13 over ISBN-10
+        const isbn13 = doc.isbn.find(isbn => isbn.length === 13);
+        const isbn10 = doc.isbn.find(isbn => isbn.length === 10);
+        return isbn13 || isbn10 || doc.isbn[0];
+      }
+    }
+
+    // If no explicit English edition found, try the first result with ISBN
+    for (const doc of data.docs) {
+      if (doc.isbn && doc.isbn.length > 0) {
+        const isbn13 = doc.isbn.find(isbn => isbn.length === 13);
+        const isbn10 = doc.isbn.find(isbn => isbn.length === 10);
+        return isbn13 || isbn10 || doc.isbn[0];
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Open Library English ISBN search error:', error);
+    return null;
+  }
+}
+
+/**
+ * Search Google Books for an English ISBN
+ */
+async function searchGoogleBooksEnglishISBN(title, author) {
+  try {
+    // Google Books allows langRestrict parameter
+    const query = encodeURIComponent(`intitle:${title} inauthor:${author}`);
+    const response = await fetch(
+      `https://www.googleapis.com/books/v1/volumes?q=${query}&langRestrict=en&maxResults=5`
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.items || data.items.length === 0) {
+      return null;
+    }
+
+    // Find an item with ISBN identifiers
+    for (const item of data.items) {
+      const volumeInfo = item.volumeInfo;
+      const industryIds = volumeInfo.industryIdentifiers || [];
+
+      // Check language is English
+      const language = volumeInfo.language;
+      if (language && language !== 'en') {
+        continue;
+      }
+
+      // Prefer ISBN-13
+      const isbn13 = industryIds.find(id => id.type === 'ISBN_13');
+      if (isbn13) {
+        return isbn13.identifier;
+      }
+
+      const isbn10 = industryIds.find(id => id.type === 'ISBN_10');
+      if (isbn10) {
+        return isbn10.identifier;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Google Books English ISBN search error:', error);
+    return null;
+  }
+}
+
 export async function lookupISBN(isbn) {
   // Clean the ISBN (remove dashes and spaces)
   const cleanIsbn = isbn.replace(/[-\s]/g, '');

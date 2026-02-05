@@ -1,28 +1,33 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import ISBNScanner from './ISBNScanner';
-import ManualISBNEntry from './ManualISBNEntry';
-import ManualBookForm from './ManualBookForm';
-import BookCard from './BookCard';
-import BookListItem from './BookListItem';
-import EditSeriesModal from './EditSeriesModal';
+import { Link } from 'react-router-dom';
+import CompletedBookCard from './CompletedBookCard';
+import CompletedBookListItem from './CompletedBookListItem';
+import ImportBooksModal from './ImportBooksModal';
+import ManualReviewModal from './ManualReviewModal';
+import EditCompletedBookModal from './EditCompletedBookModal';
 import ThemeSelector from './ThemeSelector';
-import { scanISBN, getBooks, searchAndAddBook, deleteBook, updateBook } from '../services/api';
+import {
+  getCompletedBooks,
+  deleteCompletedBook,
+  updateCompletedBook,
+  addCompletedBookToLibrary,
+  importCompletedBooks,
+  addManualReviewBook
+} from '../services/api';
 
-export default function Library() {
+export default function BooksCompleted() {
   const { user, logout, setTheme } = useAuth();
   const [books, setBooks] = useState([]);
-  const [showScanner, setShowScanner] = useState(false);
-  const [showManualEntry, setShowManualEntry] = useState(false);
-  const [showManualBookForm, setShowManualBookForm] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
-  const [manualFormISBN, setManualFormISBN] = useState(null);
-  const [editingSeriesBook, setEditingSeriesBook] = useState(null);
+  const [showManualReview, setShowManualReview] = useState(false);
+  const [booksNeedingReview, setBooksNeedingReview] = useState([]);
+  const [editingBook, setEditingBook] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid');
 
   useEffect(() => {
     loadBooks();
@@ -30,10 +35,10 @@ export default function Library() {
 
   const loadBooks = async () => {
     try {
-      const data = await getBooks();
+      const data = await getCompletedBooks();
       setBooks(data);
     } catch (err) {
-      console.error('Failed to load books:', err);
+      console.error('Failed to load completed books:', err);
     }
   };
 
@@ -54,7 +59,7 @@ export default function Library() {
     });
 
     // Sort books within each series by position
-    seriesMap.forEach((seriesBooks, seriesName) => {
+    seriesMap.forEach((seriesBooks) => {
       seriesBooks.sort((a, b) => {
         if (a.series_position == null && b.series_position == null) return 0;
         if (a.series_position == null) return 1;
@@ -71,81 +76,93 @@ export default function Library() {
     return { series: seriesArray, standalone };
   }, [books]);
 
-  const handleISBNScanned = async (isbn) => {
-    setShowScanner(false);
-    setShowManualEntry(false);
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const result = await scanISBN(isbn);
-      setMessage(result.message);
-
-      if (!result.isExisting) {
-        setBooks(prev => [result.book, ...prev]);
-      }
-    } catch (err) {
-      // If the book wasn't found, offer manual entry
-      if (err.notFound) {
-        setManualFormISBN(err.isbn || isbn);
-        setShowManualBookForm(true);
-      } else {
-        setError(err.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleManualBookSubmit = async ({ title, author, isbn }) => {
-    setShowManualBookForm(false);
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const result = await searchAndAddBook(title, author, isbn);
-      setBooks(prev => [result.book, ...prev]);
-      setManualFormISBN(null);
-      setMessage('Book added successfully!');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeleteBook = async (bookId) => {
     try {
-      await deleteBook(bookId);
+      await deleteCompletedBook(bookId);
       setBooks(prev => prev.filter(book => book.id !== bookId));
-      setMessage('Book removed from library');
+      setMessage('Book removed from completed list');
     } catch (err) {
       setError(err.message);
     }
   };
 
-  const handleEditSeries = (book) => {
-    setEditingSeriesBook(book);
+  const handleEditBook = (book) => {
+    setEditingBook(book);
   };
 
-  const handleSaveSeries = async (seriesData) => {
+  const handleSaveBook = async (bookData) => {
     try {
-      const updatedBook = await updateBook(editingSeriesBook.id, seriesData);
+      const updatedBook = await updateCompletedBook(editingBook.id, bookData);
       setBooks(prev => prev.map(book =>
         book.id === updatedBook.id ? updatedBook : book
       ));
-      setEditingSeriesBook(null);
-      setMessage('Series info updated');
+      setEditingBook(null);
+      setMessage('Book updated');
     } catch (err) {
       setError(err.message);
     }
   };
 
-  const closeManualBookForm = () => {
-    setShowManualBookForm(false);
-    setManualFormISBN(null);
+  const handleAddToLibrary = async (bookId) => {
+    try {
+      const result = await addCompletedBookToLibrary(bookId);
+      setBooks(prev => prev.map(book =>
+        book.id === bookId ? { ...book, library_book_id: result.book.id } : book
+      ));
+      setMessage(result.message);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleImportBooks = async (booksData) => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const result = await importCompletedBooks(booksData);
+
+      // Add imported books to state
+      if (result.imported.length > 0) {
+        setBooks(prev => [...result.imported, ...prev]);
+        setMessage(`Successfully imported ${result.imported.length} book(s)`);
+      }
+
+      // Handle books needing review
+      if (result.needsReview.length > 0) {
+        setBooksNeedingReview(result.needsReview);
+        setShowManualReview(true);
+      }
+
+      // Report errors
+      if (result.errors.length > 0) {
+        setError(`${result.errors.length} book(s) failed to import`);
+      }
+
+      setShowImportModal(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualReviewAdd = async (bookData) => {
+    try {
+      const newBook = await addManualReviewBook(bookData);
+      setBooks(prev => [newBook, ...prev]);
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  };
+
+  const handleManualReviewComplete = () => {
+    setBooksNeedingReview([]);
+    setShowManualReview(false);
+    setMessage('Manual review completed');
   };
 
   const handleLogout = async () => {
@@ -171,11 +188,12 @@ export default function Library() {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {series.books.map(book => (
-              <BookCard
+              <CompletedBookCard
                 key={book.id}
                 book={book}
                 onDelete={handleDeleteBook}
-                onEditSeries={handleEditSeries}
+                onEdit={handleEditBook}
+                onAddToLibrary={handleAddToLibrary}
                 showSeriesPosition
               />
             ))}
@@ -191,11 +209,12 @@ export default function Library() {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {groupedBooks.standalone.map(book => (
-              <BookCard
+              <CompletedBookCard
                 key={book.id}
                 book={book}
                 onDelete={handleDeleteBook}
-                onEditSeries={handleEditSeries}
+                onEdit={handleEditBook}
+                onAddToLibrary={handleAddToLibrary}
               />
             ))}
           </div>
@@ -219,11 +238,12 @@ export default function Library() {
             </h3>
           </div>
           {series.books.map(book => (
-            <BookListItem
+            <CompletedBookListItem
               key={book.id}
               book={book}
               onDelete={handleDeleteBook}
-              onEditSeries={handleEditSeries}
+              onEdit={handleEditBook}
+              onAddToLibrary={handleAddToLibrary}
               showSeriesPosition
             />
           ))}
@@ -239,11 +259,12 @@ export default function Library() {
             </div>
           )}
           {groupedBooks.standalone.map(book => (
-            <BookListItem
+            <CompletedBookListItem
               key={book.id}
               book={book}
               onDelete={handleDeleteBook}
-              onEditSeries={handleEditSeries}
+              onEdit={handleEditBook}
+              onAddToLibrary={handleAddToLibrary}
             />
           ))}
         </div>
@@ -265,7 +286,6 @@ export default function Library() {
                 Welcome, <span className="font-medium text-theme-primary">{user.name || user.email}</span>
               </span>
             )}
-            {/* Theme button */}
             <button
               onClick={() => setShowThemeSelector(true)}
               className="p-2 text-theme-muted hover:text-theme-primary rounded-md hover:bg-theme-secondary transition-colors"
@@ -294,13 +314,13 @@ export default function Library() {
           <div className="flex gap-4">
             <Link
               to="/"
-              className="px-4 py-3 text-theme-primary font-medium border-b-2 border-theme-accent"
+              className="px-4 py-3 text-theme-muted hover:text-theme-primary border-b-2 border-transparent hover:border-theme-accent transition-colors"
             >
               My Library
             </Link>
             <Link
               to="/completed"
-              className="px-4 py-3 text-theme-muted hover:text-theme-primary border-b-2 border-transparent hover:border-theme-accent transition-colors"
+              className="px-4 py-3 text-theme-primary font-medium border-b-2 border-theme-accent"
             >
               Books Completed
             </Link>
@@ -312,42 +332,20 @@ export default function Library() {
         {/* Action buttons */}
         <div className="flex flex-wrap gap-4 mb-6">
           <button
-            onClick={() => setShowScanner(true)}
+            onClick={() => setShowImportModal(true)}
             className="flex items-center gap-2 bg-theme-accent bg-theme-accent-hover text-theme-on-primary px-4 py-2 rounded-md transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm3 5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm0 3a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
             </svg>
-            Scan ISBN
-          </button>
-          <button
-            onClick={() => setShowManualEntry(true)}
-            className="flex items-center gap-2 bg-theme-secondary text-theme-primary px-4 py-2 rounded-md hover:opacity-80 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-              <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
-            </svg>
-            Enter ISBN
-          </button>
-          <button
-            onClick={() => {
-              setManualFormISBN(null);
-              setShowManualBookForm(true);
-            }}
-            className="flex items-center gap-2 bg-theme-card text-theme-secondary border border-theme px-4 py-2 rounded-md hover:bg-theme-secondary transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Add Manually
+            Import Books
           </button>
         </div>
 
         {/* Status messages */}
         {loading && (
           <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-6">
-            Looking up book information...
+            Processing import...
           </div>
         )}
 
@@ -367,7 +365,7 @@ export default function Library() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-theme-primary">
-              My Library ({books.length} books)
+              Books Completed ({books.length} books)
             </h2>
 
             {/* View toggle */}
@@ -396,10 +394,10 @@ export default function Library() {
           {books.length === 0 ? (
             <div className="text-center py-12 bg-theme-card rounded-lg shadow">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-theme-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-theme-primary mb-2 font-medium">Your library is empty</p>
-              <p className="text-theme-muted">Scan a book's ISBN barcode to get started</p>
+              <p className="text-theme-primary mb-2 font-medium">No completed books yet</p>
+              <p className="text-theme-muted">Import a list of books you've read to get started</p>
             </div>
           ) : viewMode === 'grid' ? (
             renderGridView()
@@ -410,33 +408,31 @@ export default function Library() {
       </main>
 
       {/* Modals */}
-      {showScanner && (
-        <ISBNScanner
-          onScan={handleISBNScanned}
-          onClose={() => setShowScanner(false)}
+      {showImportModal && (
+        <ImportBooksModal
+          onImport={handleImportBooks}
+          onClose={() => setShowImportModal(false)}
+          loading={loading}
         />
       )}
 
-      {showManualEntry && (
-        <ManualISBNEntry
-          onSubmit={handleISBNScanned}
-          onClose={() => setShowManualEntry(false)}
+      {showManualReview && (
+        <ManualReviewModal
+          books={booksNeedingReview}
+          onAddBook={handleManualReviewAdd}
+          onComplete={handleManualReviewComplete}
+          onClose={() => {
+            setBooksNeedingReview([]);
+            setShowManualReview(false);
+          }}
         />
       )}
 
-      {showManualBookForm && (
-        <ManualBookForm
-          isbn={manualFormISBN}
-          onSubmit={handleManualBookSubmit}
-          onClose={closeManualBookForm}
-        />
-      )}
-
-      {editingSeriesBook && (
-        <EditSeriesModal
-          book={editingSeriesBook}
-          onSave={handleSaveSeries}
-          onClose={() => setEditingSeriesBook(null)}
+      {editingBook && (
+        <EditCompletedBookModal
+          book={editingBook}
+          onSave={handleSaveBook}
+          onClose={() => setEditingBook(null)}
         />
       )}
 
