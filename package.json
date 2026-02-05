@@ -12,6 +12,7 @@
     "db:migrate": "node server/db/migrate.js",
     "db:migrate-auth": "node server/db/migrate-auth.js",
     "db:migrate-completed": "node server/db/migrate-completed-books.js",
+    "db:migrate-reading-status": "node server/db/migrate-reading-status.js",
     "build": "cd client && npm run build",
     "start": "NODE_ENV=production node server/index.js"
   },
@@ -31,7 +32,9 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
-    "uuid": "^11.0.4"
+    "resend": "^6.9.1",
+    "uuid": "^11.0.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

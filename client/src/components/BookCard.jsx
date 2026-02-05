@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosition }) {
   const handleDelete = () => {
     if (window.confirm(`Remove "${book.title}" from your library?`)) {
@@ -34,7 +36,9 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
             {Number.isInteger(book.series_position) ? book.series_position : book.series_position.toFixed(1)}
           </span>
         )}
-        <h3 className="text-lg font-semibold text-theme-primary pr-12">{book.title}</h3>
+        <Link to={`/book/${book.id}`} className="text-lg font-semibold text-theme-primary pr-12 hover:text-theme-accent transition-colors">
+          {book.title}
+        </Link>
       </div>
 
       {book.author && (
@@ -42,6 +46,15 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
       )}
 
       <div className="flex flex-wrap gap-2 mb-3">
+        {book.reading_status && book.reading_status !== 'unread' && (
+          <span className={`text-xs px-2 py-1 rounded font-medium ${
+            book.reading_status === 'read'
+              ? 'bg-green-100 text-green-800'
+              : 'bg-blue-100 text-blue-800'
+          }`}>
+            {book.reading_status === 'read' ? '✓ Read' : '📖 Reading'}
+          </span>
+        )}
         {book.page_count && (
           <span className="text-xs bg-theme-secondary text-theme-muted px-2 py-1 rounded">
             {book.page_count} pages

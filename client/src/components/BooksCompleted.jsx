@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import CompletedBookCard from './CompletedBookCard';
 import CompletedBookListItem from './CompletedBookListItem';
-import ImportBooksModal from './ImportBooksModal';
+import CompletedBooksImportModal from './CompletedBooksImportModal';
 import ManualReviewModal from './ManualReviewModal';
 import EditCompletedBookModal from './EditCompletedBookModal';
 import ThemeSelector from './ThemeSelector';
@@ -409,7 +409,7 @@ export default function BooksCompleted() {
 
       {/* Modals */}
       {showImportModal && (
-        <ImportBooksModal
+        <CompletedBooksImportModal
           onImport={handleImportBooks}
           onClose={() => setShowImportModal(false)}
           loading={loading}

@@ -32,7 +32,8 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS books (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    isbn TEXT UNIQUE,
+    user_id INTEGER NOT NULL,
+    isbn TEXT,
     title TEXT NOT NULL,
     author TEXT,
     page_count INTEGER,
@@ -41,8 +42,12 @@ db.exec(`
     tags TEXT,
     series_name TEXT,
     series_position REAL,
+    reading_status TEXT DEFAULT 'unread',
+    date_finished DATE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, isbn)
   );
 
   CREATE TABLE IF NOT EXISTS reading_history (
@@ -61,6 +66,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
   CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
   CREATE INDEX IF NOT EXISTS idx_books_title ON books(title);
+  CREATE INDEX IF NOT EXISTS idx_books_user_id ON books(user_id);
 `);
 
 console.log('Database setup complete!');
