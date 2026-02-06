@@ -10,6 +10,8 @@ import UserProfile from './components/UserProfile';
 import FAQPage from './components/FAQPage';
 import QuizPage from './components/QuizPage';
 import BookProfile from './components/BookProfile';
+import BooksCompleted from './components/BooksCompleted';
+import CompletedBookProfile from './components/CompletedBookProfile';
 
 // Loading spinner component
 function LoadingScreen() {
@@ -121,6 +123,22 @@ function App() {
         element={
           <ProtectedRoute>
             <QuizPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/books-completed"
+        element={
+          <ProtectedRoute>
+            <BooksCompleted />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/completed-book/:id"
+        element={
+          <ProtectedRoute>
+            <CompletedBookProfile />
           </ProtectedRoute>
         }
       />

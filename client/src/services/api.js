@@ -506,3 +506,194 @@ function readFileAsBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+
+// ============ COMPLETED BOOKS API ============
+
+export async function getCompletedBooks() {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch completed books');
+  }
+
+  return response.json();
+}
+
+export async function getCompletedBook(id) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${id}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch completed book');
+  }
+
+  return response.json();
+}
+
+export async function deleteCompletedBook(id) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${id}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete completed book');
+  }
+
+  return response.json();
+}
+
+export async function updateCompletedBook(id, updates) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update completed book');
+  }
+
+  return response.json();
+}
+
+export async function addCompletedBookToLibrary(id) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${id}/add-to-library`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to add book to library');
+  }
+
+  return response.json();
+}
+
+export async function getCompletedSeriesList() {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/series/list`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch completed books series');
+  }
+
+  return response.json();
+}
+
+// ============ COMPLETED BOOK RATINGS API ============
+
+export async function getCompletedBookRating(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${bookId}/rating`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch rating');
+  }
+
+  return response.json();
+}
+
+export async function saveCompletedBookRating(bookId, rating, comment = null) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${bookId}/rating`, {
+    method: 'POST',
+    body: JSON.stringify({ rating, comment }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to save rating');
+  }
+
+  return response.json();
+}
+
+export async function deleteCompletedBookRating(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/${bookId}/rating`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete rating');
+  }
+
+  return response.json();
+}
+
+// ============ COMPLETED BOOKS EXPORT API ============
+
+export async function exportCompletedBooks(type = 'comprehensive', format = 'json') {
+  const response = await fetchWithCredentials(
+    `${API_BASE}/completed-books/export?type=${encodeURIComponent(type)}&format=${encodeURIComponent(format)}`
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to export completed books');
+  }
+
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `shelfwise-completed-books-${type}-${new Date().toISOString().split('T')[0]}.${format}`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="(.+)"/);
+    if (match) {
+      filename = match[1];
+    }
+  }
+
+  const blob = await response.blob();
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+
+  return { success: true, filename };
+}
+
+// ============ COMPLETED BOOKS IMPORT API ============
+
+// Step 1: Parse and lookup - returns books categorized by found/notFound/duplicates/libraryUpdates
+export async function parseCompletedBooksImport(file) {
+  const format = getFileFormat(file.name);
+
+  let data;
+  if (format === 'xlsx' || format === 'xls') {
+    data = await readFileAsBase64(file);
+  } else {
+    data = await readFileAsText(file);
+  }
+
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/import/parse`, {
+    method: 'POST',
+    body: JSON.stringify({ data, format }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Failed to parse import file');
+  }
+
+  return result;
+}
+
+// Step 2: Confirm and import selected books + update library books
+export async function confirmCompletedBooksImport(booksToImport, libraryUpdates = []) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/import/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ booksToImport, libraryUpdates }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Failed to import completed books');
+  }
+
+  return result;
+}

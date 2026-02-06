@@ -428,6 +428,11 @@ router.post('/import/confirm', async (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    const insertCompletedStmt = db.prepare(`
+      INSERT INTO books_completed (user_id, isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position, date_finished, owned)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `);
+
     for (const book of booksToImport) {
       try {
         // Final duplicate check
@@ -446,6 +451,7 @@ router.post('/import/confirm', async (req, res) => {
         }
 
         const tagsJson = Array.isArray(book.tags) ? JSON.stringify(book.tags) : '[]';
+        const readingStatus = book.reading_status || 'unread';
 
         const result = insertStmt.run(
           userId,
@@ -458,9 +464,57 @@ router.post('/import/confirm', async (req, res) => {
           tagsJson,
           book.series_name || null,
           book.series_position || null,
-          book.reading_status || 'unread',
+          readingStatus,
           book.date_finished || null
         );
+
+        // If book is marked as read, also add to books_completed
+        if (readingStatus === 'read') {
+          // Check if already in books_completed
+          let existingCompleted = null;
+          if (book.isbn) {
+            existingCompleted = db.prepare('SELECT id FROM books_completed WHERE isbn = ? AND user_id = ?').get(book.isbn, userId);
+          }
+          if (!existingCompleted && book.title && book.author) {
+            existingCompleted = db.prepare('SELECT id FROM books_completed WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?) AND user_id = ?').get(book.title, book.author, userId);
+          }
+
+          if (existingCompleted) {
+            // Update existing completed book
+            db.prepare(`
+              UPDATE books_completed
+              SET title = ?, author = ?, page_count = ?, genre = ?, synopsis = ?, tags = ?,
+                  series_name = ?, series_position = ?, date_finished = ?, owned = 1, updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(
+              book.title,
+              book.author || null,
+              book.page_count || null,
+              book.genre || null,
+              book.synopsis || null,
+              tagsJson,
+              book.series_name || null,
+              book.series_position || null,
+              book.date_finished || null,
+              existingCompleted.id
+            );
+          } else {
+            // Insert new completed book
+            insertCompletedStmt.run(
+              userId,
+              book.isbn || null,
+              book.title,
+              book.author || null,
+              book.page_count || null,
+              book.genre || null,
+              book.synopsis || null,
+              tagsJson,
+              book.series_name || null,
+              book.series_position || null,
+              book.date_finished || null
+            );
+          }
+        }
 
         const newBook = db.prepare('SELECT * FROM books WHERE id = ?').get(result.lastInsertRowid);
         newBook.tags = newBook.tags ? JSON.parse(newBook.tags) : [];
@@ -713,20 +767,82 @@ router.put('/:id', validateIdParam, validateBook, (req, res) => {
       WHERE id = ? AND user_id = ?
     `);
 
+    const finalReadingStatus = reading_status !== undefined ? reading_status : existing.reading_status;
+    const finalDateFinished = date_finished !== undefined ? date_finished : existing.date_finished;
+    const finalTitle = title ?? existing.title;
+    const finalAuthor = author ?? existing.author;
+    const finalPageCount = page_count ?? existing.page_count;
+    const finalGenre = genre ?? existing.genre;
+    const finalSynopsis = synopsis ?? existing.synopsis;
+    const finalTags = Array.isArray(tags) ? JSON.stringify(tags) : tags ?? existing.tags;
+    const finalSeriesName = series_name !== undefined ? series_name : existing.series_name;
+    const finalSeriesPosition = series_position !== undefined ? series_position : existing.series_position;
+
     stmt.run(
-      title ?? existing.title,
-      author ?? existing.author,
-      page_count ?? existing.page_count,
-      genre ?? existing.genre,
-      synopsis ?? existing.synopsis,
-      Array.isArray(tags) ? JSON.stringify(tags) : tags ?? existing.tags,
-      series_name !== undefined ? series_name : existing.series_name,
-      series_position !== undefined ? series_position : existing.series_position,
-      reading_status !== undefined ? reading_status : existing.reading_status,
-      date_finished !== undefined ? date_finished : existing.date_finished,
+      finalTitle,
+      finalAuthor,
+      finalPageCount,
+      finalGenre,
+      finalSynopsis,
+      finalTags,
+      finalSeriesName,
+      finalSeriesPosition,
+      finalReadingStatus,
+      finalDateFinished,
       bookId,
       userId
     );
+
+    // If book is marked as read, add/update it in books_completed table
+    if (finalReadingStatus === 'read') {
+      // Check if already in books_completed by ISBN or title+author
+      let existingCompleted = null;
+      if (existing.isbn) {
+        existingCompleted = db.prepare('SELECT id FROM books_completed WHERE isbn = ? AND user_id = ?').get(existing.isbn, userId);
+      }
+      if (!existingCompleted && finalTitle && finalAuthor) {
+        existingCompleted = db.prepare('SELECT id FROM books_completed WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?) AND user_id = ?').get(finalTitle, finalAuthor, userId);
+      }
+
+      if (existingCompleted) {
+        // Update existing completed book
+        db.prepare(`
+          UPDATE books_completed
+          SET title = ?, author = ?, page_count = ?, genre = ?, synopsis = ?, tags = ?,
+              series_name = ?, series_position = ?, date_finished = ?, owned = 1, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(
+          finalTitle,
+          finalAuthor,
+          finalPageCount,
+          finalGenre,
+          finalSynopsis,
+          finalTags,
+          finalSeriesName,
+          finalSeriesPosition,
+          finalDateFinished,
+          existingCompleted.id
+        );
+      } else {
+        // Insert new completed book
+        db.prepare(`
+          INSERT INTO books_completed (user_id, isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position, date_finished, owned)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        `).run(
+          userId,
+          existing.isbn,
+          finalTitle,
+          finalAuthor,
+          finalPageCount,
+          finalGenre,
+          finalSynopsis,
+          finalTags,
+          finalSeriesName,
+          finalSeriesPosition,
+          finalDateFinished
+        );
+      }
+    }
 
     const updatedBook = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId);
     updatedBook.tags = updatedBook.tags ? JSON.parse(updatedBook.tags) : [];
