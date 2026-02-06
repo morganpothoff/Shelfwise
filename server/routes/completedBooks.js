@@ -421,10 +421,12 @@ router.post('/import/confirm', async (req, res) => {
     const results = {
       imported: 0,
       updated: 0,
+      addedToLibrary: 0,
       failed: 0,
       errors: [],
       books: [],
-      updatedLibraryBooks: []
+      updatedLibraryBooks: [],
+      newLibraryBooks: []
     };
 
     // Process library updates - mark existing library books as read
@@ -453,23 +455,28 @@ router.post('/import/confirm', async (req, res) => {
 
     // Process new completed books
     if (booksToImport && Array.isArray(booksToImport)) {
-      const insertStmt = db.prepare(`
+      const insertCompletedStmt = db.prepare(`
         INSERT INTO books_completed (user_id, isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position, date_finished, owned)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
+      const insertLibraryStmt = db.prepare(`
+        INSERT INTO books (user_id, isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position, reading_status, date_finished)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'read', ?)
+      `);
+
       for (const book of booksToImport) {
         try {
-          // Final duplicate check
-          let existingBook = null;
+          // Final duplicate check for completed books
+          let existingCompleted = null;
           if (book.isbn) {
-            existingBook = db.prepare('SELECT id FROM books_completed WHERE isbn = ? AND user_id = ?').get(book.isbn, userId);
+            existingCompleted = db.prepare('SELECT id FROM books_completed WHERE isbn = ? AND user_id = ?').get(book.isbn, userId);
           }
-          if (!existingBook && book.title && book.author) {
-            existingBook = db.prepare('SELECT id FROM books_completed WHERE title = ? AND author = ? AND user_id = ?').get(book.title, book.author, userId);
+          if (!existingCompleted && book.title && book.author) {
+            existingCompleted = db.prepare('SELECT id FROM books_completed WHERE title = ? AND author = ? AND user_id = ?').get(book.title, book.author, userId);
           }
 
-          if (existingBook) {
+          if (existingCompleted) {
             results.errors.push(`Skipped "${book.title}": already in completed books`);
             results.failed++;
             continue;
@@ -477,7 +484,8 @@ router.post('/import/confirm', async (req, res) => {
 
           const tagsJson = Array.isArray(book.tags) ? JSON.stringify(book.tags) : '[]';
 
-          const result = insertStmt.run(
+          // Insert into completed books
+          const result = insertCompletedStmt.run(
             userId,
             book.isbn || null,
             book.title,
@@ -496,6 +504,48 @@ router.post('/import/confirm', async (req, res) => {
           newBook.tags = newBook.tags ? JSON.parse(newBook.tags) : [];
           results.books.push(newBook);
           results.imported++;
+
+          // If book is owned, also add to library (if not already there)
+          // Books with ISBN get added with full metadata
+          // Books without ISBN (notFound list) still get added with basic info since user marked them as owned
+          if (book.owned) {
+            // Check if already in library by ISBN (if we have one)
+            let existingLibrary = null;
+            if (book.isbn) {
+              existingLibrary = db.prepare('SELECT id FROM books WHERE isbn = ? AND user_id = ?').get(book.isbn, userId);
+            }
+
+            // Also check by title+author
+            if (!existingLibrary && book.title && book.author) {
+              existingLibrary = db.prepare('SELECT id FROM books WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?) AND user_id = ?').get(book.title, book.author, userId);
+            }
+
+            if (!existingLibrary) {
+              try {
+                const libraryResult = insertLibraryStmt.run(
+                  userId,
+                  book.isbn || null, // May be null for notFound books
+                  book.title,
+                  book.author || null,
+                  book.page_count || null,
+                  book.genre || null,
+                  book.synopsis || null,
+                  tagsJson,
+                  book.series_name || null,
+                  book.series_position || null,
+                  book.date_finished || null
+                );
+
+                const newLibraryBook = db.prepare('SELECT * FROM books WHERE id = ?').get(libraryResult.lastInsertRowid);
+                newLibraryBook.tags = newLibraryBook.tags ? JSON.parse(newLibraryBook.tags) : [];
+                results.newLibraryBooks.push(newLibraryBook);
+                results.addedToLibrary++;
+              } catch (libraryErr) {
+                // Don't fail the whole import if library insert fails, just log it
+                console.error(`Failed to add "${book.title}" to library:`, libraryErr.message);
+              }
+            }
+          }
         } catch (err) {
           results.errors.push(`Error importing "${book.title}": ${err.message}`);
           results.failed++;
@@ -503,14 +553,17 @@ router.post('/import/confirm', async (req, res) => {
       }
     }
 
+    const libraryMsg = results.addedToLibrary > 0 ? `, ${results.addedToLibrary} added to library` : '';
     res.json({
-      message: `Import complete: ${results.imported} books imported, ${results.updated} library books updated, ${results.failed} failed`,
+      message: `Import complete: ${results.imported} books imported, ${results.updated} library books updated${libraryMsg}, ${results.failed} failed`,
       imported: results.imported,
       updated: results.updated,
+      addedToLibrary: results.addedToLibrary,
       failed: results.failed,
       errors: results.errors,
       books: results.books,
-      updatedLibraryBooks: results.updatedLibraryBooks
+      updatedLibraryBooks: results.updatedLibraryBooks,
+      newLibraryBooks: results.newLibraryBooks
     });
   } catch (error) {
     handleError(res, error, 'Failed to import completed books');

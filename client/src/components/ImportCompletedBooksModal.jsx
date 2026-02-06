@@ -168,8 +168,8 @@ export default function ImportCompletedBooksModal({ onClose, onImportComplete })
       setImportResults(results);
       setStep(STEPS.DONE);
 
-      if (results.imported > 0 || results.updated > 0) {
-        onImportComplete(results.books, results.updatedLibraryBooks);
+      if (results.imported > 0 || results.updated > 0 || results.addedToLibrary > 0) {
+        onImportComplete(results.books, results.updatedLibraryBooks, results.newLibraryBooks);
       }
     } catch (err) {
       setError(err.message);
@@ -630,51 +630,64 @@ export default function ImportCompletedBooksModal({ onClose, onImportComplete })
     </div>
   );
 
-  const renderDoneStep = () => (
-    <div>
-      <div className={`p-4 rounded-lg mb-4 ${
-        (importResults.imported > 0 || importResults.updated > 0) ? 'bg-green-100 border border-green-400' : 'bg-yellow-100 border border-yellow-400'
-      }`}>
-        <div className="flex items-center gap-3">
-          {(importResults.imported > 0 || importResults.updated > 0) ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          )}
-          <div>
-            <p className={`font-medium ${(importResults.imported > 0 || importResults.updated > 0) ? 'text-green-800' : 'text-yellow-800'}`}>
-              {importResults.message}
+  const renderDoneStep = () => {
+    const hasSuccess = importResults.imported > 0 || importResults.updated > 0 || importResults.addedToLibrary > 0;
+
+    return (
+      <div>
+        <div className={`p-4 rounded-lg mb-4 ${
+          hasSuccess ? 'bg-green-100 border border-green-400' : 'bg-yellow-100 border border-yellow-400'
+        }`}>
+          <div className="flex items-center gap-3">
+            {hasSuccess ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            )}
+            <div>
+              <p className={`font-medium ${hasSuccess ? 'text-green-800' : 'text-yellow-800'}`}>
+                {importResults.message}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Show books added to library */}
+        {importResults.addedToLibrary > 0 && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <span className="font-medium">{importResults.addedToLibrary} owned books</span> were also added to your library.
             </p>
           </div>
-        </div>
-      </div>
+        )}
 
-      {importResults.errors && importResults.errors.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-theme-primary mb-2">Import Notes:</h3>
-          <div className="max-h-32 overflow-y-auto bg-theme-secondary rounded-md p-3">
-            {importResults.errors.map((err, index) => (
-              <p key={index} className="text-xs text-theme-muted py-0.5">
-                {err}
-              </p>
-            ))}
+        {importResults.errors && importResults.errors.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-theme-primary mb-2">Import Notes:</h3>
+            <div className="max-h-32 overflow-y-auto bg-theme-secondary rounded-md p-3">
+              {importResults.errors.map((err, index) => (
+                <p key={index} className="text-xs text-theme-muted py-0.5">
+                  {err}
+                </p>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <button
-        type="button"
-        onClick={onClose}
-        className="w-full px-4 py-2 bg-theme-accent bg-theme-accent-hover text-theme-on-primary rounded-md"
-      >
-        Done
-      </button>
-    </div>
-  );
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full px-4 py-2 bg-theme-accent bg-theme-accent-hover text-theme-on-primary rounded-md"
+        >
+          Done
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">

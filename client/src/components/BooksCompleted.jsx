@@ -149,10 +149,22 @@ export default function BooksCompleted() {
     }
   };
 
-  const handleImportComplete = (importedBooks) => {
+  const handleImportComplete = (importedBooks, updatedLibraryBooks, newLibraryBooks) => {
     if (importedBooks && importedBooks.length > 0) {
       setBooks(prev => [...importedBooks, ...prev]);
-      setMessage(`Successfully imported ${importedBooks.length} completed books!`);
+    }
+
+    // Build success message
+    const messages = [];
+    if (importedBooks && importedBooks.length > 0) {
+      messages.push(`${importedBooks.length} completed books imported`);
+    }
+    if (newLibraryBooks && newLibraryBooks.length > 0) {
+      messages.push(`${newLibraryBooks.length} owned books added to library`);
+    }
+
+    if (messages.length > 0) {
+      setMessage(`Success! ${messages.join(', ')}`);
     }
   };
 
