@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar';
 import { getBooks, updateBook } from '../services/api';
@@ -74,10 +74,21 @@ function Confetti({ active }) {
   );
 }
 
+function isEligibleBook(book, includeRead) {
+  // Status filter: always include unread, optionally include read
+  const statusOk = book.reading_status === 'unread' || (includeRead && book.reading_status === 'read');
+  if (!statusOk) return false;
+  // Exclude books that are part of a series but not the first entry
+  if (book.series_name && book.series_position != null && book.series_position > 1) return false;
+  return true;
+}
+
 export default function PickForMe() {
   const [allBooks, setAllBooks] = useState([]);
   const [currentBook, setCurrentBook] = useState(null);
   const [selectedBookId, setSelectedBookId] = useState(null);
+  const [seenIds, setSeenIds] = useState(new Set());
+  const [includeRead, setIncludeRead] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(false);
@@ -85,16 +96,25 @@ export default function PickForMe() {
   const [successMessage, setSuccessMessage] = useState(null);
   const [shuffling, setShuffling] = useState(false);
 
+  // Derive the eligible pool from allBooks + the include-read toggle
+  const eligibleBooks = useMemo(
+    () => allBooks.filter((b) => isEligibleBook(b, includeRead)),
+    [allBooks, includeRead]
+  );
+
   const loadBooks = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const books = await getBooks();
-      const unreadBooks = books.filter((b) => b.reading_status === 'unread');
-      setAllBooks(unreadBooks);
-      if (unreadBooks.length > 0) {
-        const randomIndex = Math.floor(Math.random() * unreadBooks.length);
-        setCurrentBook(unreadBooks[randomIndex]);
+      setAllBooks(books);
+
+      // Pick initial book from the default pool (unread only)
+      const initialPool = books.filter((b) => isEligibleBook(b, false));
+      if (initialPool.length > 0) {
+        const pick = initialPool[Math.floor(Math.random() * initialPool.length)];
+        setCurrentBook(pick);
+        setSeenIds(new Set([pick.id]));
       }
     } catch (err) {
       setError(err.message);
@@ -107,18 +127,54 @@ export default function PickForMe() {
     loadBooks();
   }, [loadBooks]);
 
+  // When the checkbox changes, if the current book is no longer eligible,
+  // pick a new one from the updated pool.
+  useEffect(() => {
+    if (loading || successMessage) return;
+    if (currentBook && isEligibleBook(currentBook, includeRead)) return;
+
+    // Current book is no longer eligible — pick a fresh one
+    if (eligibleBooks.length > 0) {
+      const pick = eligibleBooks[Math.floor(Math.random() * eligibleBooks.length)];
+      setCurrentBook(pick);
+      setSeenIds(new Set([pick.id]));
+    } else {
+      setCurrentBook(null);
+    }
+  }, [includeRead]); // intentionally limited deps — only react to toggle change
+
+  const pickNextUnseen = useCallback(() => {
+    const unseen = eligibleBooks.filter((b) => !seenIds.has(b.id));
+
+    // If everything has been seen, reset and pick from full pool
+    const pool = unseen.length > 0 ? unseen : eligibleBooks;
+    const newSeen = unseen.length > 0 ? seenIds : new Set();
+
+    if (pool.length === 0) return null;
+
+    // Avoid showing the same book back-to-back even after a reset
+    let pick;
+    if (pool.length === 1) {
+      pick = pool[0];
+    } else {
+      do {
+        pick = pool[Math.floor(Math.random() * pool.length)];
+      } while (pick.id === currentBook?.id);
+    }
+
+    const updatedSeen = new Set(newSeen);
+    updatedSeen.add(pick.id);
+    setSeenIds(updatedSeen);
+    return pick;
+  }, [eligibleBooks, seenIds, currentBook]);
+
   const handleShuffle = () => {
-    if (allBooks.length <= 1) return;
+    if (eligibleBooks.length <= 1) return;
 
     setShuffling(true);
     setSuccessMessage(null);
 
-    // Pick a different book than the current one
-    let nextBook;
-    do {
-      const randomIndex = Math.floor(Math.random() * allBooks.length);
-      nextBook = allBooks[randomIndex];
-    } while (nextBook.id === currentBook?.id && allBooks.length > 1);
+    const nextBook = pickNextUnseen();
 
     setTimeout(() => {
       setCurrentBook(nextBook);
@@ -137,7 +193,7 @@ export default function PickForMe() {
       setSelectedBookId(currentBook.id);
       setSuccessMessage(`"${currentBook.title}" is now set to Currently Reading!`);
 
-      // Remove from unread pool
+      // Remove from the master list so it won't appear again
       setAllBooks((prev) => prev.filter((b) => b.id !== currentBook.id));
 
       setTimeout(() => setShowConfetti(false), 4500);
@@ -146,6 +202,12 @@ export default function PickForMe() {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const handleIncludeReadChange = (e) => {
+    setIncludeRead(e.target.checked);
+    // Reset seen history when toggling so the user gets a fresh cycle
+    setSeenIds(currentBook ? new Set([currentBook.id]) : new Set());
   };
 
   if (loading) {
@@ -180,20 +242,46 @@ export default function PickForMe() {
     );
   }
 
-  if (allBooks.length === 0 && !successMessage) {
+  if (eligibleBooks.length === 0 && !successMessage) {
     return (
       <div className="min-h-screen bg-theme-primary">
         <Navbar />
         <main className="max-w-4xl mx-auto py-12 px-4">
+          {/* Back link */}
+          <Link
+            to="/pick-my-next-book"
+            className="inline-flex items-center gap-2 text-theme-secondary hover:text-theme-accent transition-colors mb-6"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            </svg>
+            Back to Pick My Next Book
+          </Link>
+
+          {/* Include read checkbox */}
+          <div className="flex justify-end mb-6">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeRead}
+                onChange={handleIncludeReadChange}
+                className="w-4 h-4 rounded border-theme text-theme-accent focus:ring-theme-accent"
+              />
+              <span className="text-sm text-theme-secondary">Include books already read</span>
+            </label>
+          </div>
+
           <div className="text-center py-12">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-theme-accent/10 rounded-full mb-6">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-theme-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-theme-primary mb-2">No unread books</h2>
+            <h2 className="text-2xl font-bold text-theme-primary mb-2">No eligible books</h2>
             <p className="text-theme-muted max-w-md mx-auto">
-              All books in your library have been read or are currently being read. Add more books to your library to use this feature.
+              {includeRead
+                ? 'All books in your library are currently being read or are later entries in a series. Add more books to use this feature.'
+                : 'All books in your library have been read or are currently being read. Try checking "Include books already read" above, or add more books to your library.'}
             </p>
           </div>
         </main>
@@ -217,6 +305,21 @@ export default function PickForMe() {
           </svg>
           Back to Pick My Next Book
         </Link>
+
+        {/* Include read checkbox */}
+        {!successMessage && (
+          <div className="flex justify-end mb-4">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeRead}
+                onChange={handleIncludeReadChange}
+                className="w-4 h-4 rounded border-theme text-theme-accent focus:ring-theme-accent"
+              />
+              <span className="text-sm text-theme-secondary">Include books already read</span>
+            </label>
+          </div>
+        )}
 
         {/* Success message */}
         {successMessage && (
@@ -326,7 +429,7 @@ export default function PickForMe() {
 
               <button
                 onClick={handleShuffle}
-                disabled={allBooks.length <= 1 || shuffling}
+                disabled={eligibleBooks.length <= 1 || shuffling}
                 className="flex-1 bg-theme-card border-2 border-theme text-theme-primary py-3 px-6 rounded-lg font-semibold transition-colors hover:bg-theme-secondary disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${shuffling ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
