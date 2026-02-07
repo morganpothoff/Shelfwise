@@ -8,7 +8,10 @@ import VerifyEmailPage from './components/VerifyEmailPage';
 import Library from './components/Library';
 import UserProfile from './components/UserProfile';
 import FAQPage from './components/FAQPage';
-import QuizPage from './components/QuizPage';
+import PickMyNextBook from './components/PickMyNextBook';
+import PickForMe from './components/PickForMe';
+import PickANumber from './components/PickANumber';
+import AnalyzeMe from './components/AnalyzeMe';
 import BookProfile from './components/BookProfile';
 import BooksCompleted from './components/BooksCompleted';
 import CompletedBookProfile from './components/CompletedBookProfile';
@@ -119,10 +122,34 @@ function App() {
         }
       />
       <Route
-        path="/quiz"
+        path="/pick-my-next-book"
         element={
           <ProtectedRoute>
-            <QuizPage />
+            <PickMyNextBook />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pick-my-next-book/pick-for-me"
+        element={
+          <ProtectedRoute>
+            <PickForMe />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pick-my-next-book/pick-a-number"
+        element={
+          <ProtectedRoute>
+            <PickANumber />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pick-my-next-book/analyze-me"
+        element={
+          <ProtectedRoute>
+            <AnalyzeMe />
           </ProtectedRoute>
         }
       />

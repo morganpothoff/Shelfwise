@@ -7,6 +7,8 @@ export default function Navbar() {
   const { user, logout, setTheme, isAuthenticated } = useAuth();
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pickDropdownOpen, setPickDropdownOpen] = useState(false);
+  const [mobilePickExpanded, setMobilePickExpanded] = useState(false);
   const location = useLocation();
 
   const handleLogout = async () => {
@@ -18,7 +20,12 @@ export default function Navbar() {
     setShowThemeSelector(false);
   };
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    if (path === '/pick-my-next-book') {
+      return location.pathname.startsWith('/pick-my-next-book');
+    }
+    return location.pathname === path;
+  };
 
   const navLinks = [
     { path: '/', label: 'My Library', icon: (
@@ -31,11 +38,15 @@ export default function Navbar() {
         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
       </svg>
     ), requiresAuth: true },
-    { path: '/quiz', label: 'Find My Next Read', icon: (
+    { path: '/pick-my-next-book', label: 'Pick My Next Book', icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
       </svg>
-    ), requiresAuth: true, comingSoon: true },
+    ), requiresAuth: true, hasDropdown: true, subItems: [
+      { path: '/pick-my-next-book/pick-for-me', label: 'Pick for me' },
+      { path: '/pick-my-next-book/pick-a-number', label: 'Pick a number' },
+      { path: '/pick-my-next-book/analyze-me', label: 'Analyze me' },
+    ] },
     { path: '/faq', label: 'FAQ', icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
@@ -65,24 +76,68 @@ export default function Navbar() {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-1">
               {filteredNavLinks.map(link => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors relative ${
-                    isActive(link.path)
-                      ? 'bg-theme-accent/10 text-theme-accent font-medium'
-                      : 'text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary'
-                  }`}
-                  title={link.label}
-                >
-                  {link.icon}
-                  <span>{link.label}</span>
-                  {link.comingSoon && (
-                    <span className="absolute -top-1 -right-1 bg-theme-accent text-theme-on-primary text-xs px-1.5 py-0.5 rounded-full font-medium">
-                      Soon
-                    </span>
-                  )}
-                </Link>
+                link.hasDropdown ? (
+                  <div key={link.path} className="relative flex items-center">
+                    <Link
+                      to={link.path}
+                      className={`flex items-center gap-2 pl-4 pr-1 py-2 rounded-l-lg transition-colors ${
+                        isActive(link.path)
+                          ? 'bg-theme-accent/10 text-theme-accent font-medium'
+                          : 'text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary'
+                      }`}
+                      title={link.label}
+                    >
+                      {link.icon}
+                      <span>{link.label}</span>
+                    </Link>
+                    <button
+                      onClick={() => setPickDropdownOpen(!pickDropdownOpen)}
+                      onBlur={() => setTimeout(() => setPickDropdownOpen(false), 150)}
+                      className={`flex items-center pr-3 pl-1 py-2 rounded-r-lg transition-colors ${
+                        isActive(link.path)
+                          ? 'bg-theme-accent/10 text-theme-accent'
+                          : 'text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary'
+                      }`}
+                      title="Show options"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${pickDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    {pickDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-1 w-48 bg-theme-card rounded-lg shadow-lg border border-theme py-1 z-50">
+                        {link.subItems.map(sub => (
+                          <Link
+                            key={sub.path}
+                            to={sub.path}
+                            onClick={() => setPickDropdownOpen(false)}
+                            className={`block px-4 py-2.5 text-sm transition-colors ${
+                              location.pathname === sub.path
+                                ? 'bg-theme-accent/10 text-theme-accent font-medium'
+                                : 'text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary'
+                            }`}
+                          >
+                            {sub.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors relative ${
+                      isActive(link.path)
+                        ? 'bg-theme-accent/10 text-theme-accent font-medium'
+                        : 'text-theme-secondary hover:bg-theme-secondary hover:text-theme-primary'
+                    }`}
+                    title={link.label}
+                  >
+                    {link.icon}
+                    <span>{link.label}</span>
+                  </Link>
+                )
               ))}
             </div>
 
@@ -156,24 +211,64 @@ export default function Navbar() {
           <div className="md:hidden border-t border-theme bg-theme-card">
             <div className="px-4 py-3 space-y-1">
               {filteredNavLinks.map(link => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive(link.path)
-                      ? 'bg-theme-accent/10 text-theme-accent font-medium'
-                      : 'text-theme-secondary hover:bg-theme-secondary'
-                  }`}
-                >
-                  {link.icon}
-                  <span>{link.label}</span>
-                  {link.comingSoon && (
-                    <span className="bg-theme-accent text-theme-on-primary text-xs px-2 py-0.5 rounded-full font-medium ml-auto">
-                      Coming Soon
-                    </span>
-                  )}
-                </Link>
+                link.hasDropdown ? (
+                  <div key={link.path}>
+                    <div className={`flex items-center rounded-lg transition-colors ${
+                      isActive(link.path)
+                        ? 'bg-theme-accent/10 text-theme-accent font-medium'
+                        : 'text-theme-secondary hover:bg-theme-secondary'
+                    }`}>
+                      <Link
+                        to={link.path}
+                        onClick={() => { setMobileMenuOpen(false); setMobilePickExpanded(false); }}
+                        className="flex-1 flex items-center gap-3 pl-4 py-3"
+                      >
+                        {link.icon}
+                        <span>{link.label}</span>
+                      </Link>
+                      <button
+                        onClick={() => setMobilePickExpanded(!mobilePickExpanded)}
+                        className="px-4 py-3"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${mobilePickExpanded ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                    {mobilePickExpanded && (
+                      <div className="ml-8 mt-1 space-y-1">
+                        {link.subItems.map(sub => (
+                          <Link
+                            key={sub.path}
+                            to={sub.path}
+                            onClick={() => { setMobileMenuOpen(false); setMobilePickExpanded(false); }}
+                            className={`block px-4 py-2.5 rounded-lg text-sm transition-colors ${
+                              location.pathname === sub.path
+                                ? 'bg-theme-accent/10 text-theme-accent font-medium'
+                                : 'text-theme-secondary hover:bg-theme-secondary'
+                            }`}
+                          >
+                            {sub.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      isActive(link.path)
+                        ? 'bg-theme-accent/10 text-theme-accent font-medium'
+                        : 'text-theme-secondary hover:bg-theme-secondary'
+                    }`}
+                  >
+                    {link.icon}
+                    <span>{link.label}</span>
+                  </Link>
+                )
               ))}
 
               {isAuthenticated && (
