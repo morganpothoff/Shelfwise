@@ -127,6 +127,21 @@ router.get('/export', (req, res) => {
   }
 });
 
+// Helper to strip Goodreads ISBN format: ="0060590297" -> 0060590297
+function cleanGoodreadsValue(value) {
+  if (typeof value !== 'string') return value;
+  // Goodreads wraps ISBNs as ="VALUE" — strip the ="..." wrapper
+  const match = value.match(/^="?(.*?)"?$/);
+  if (match) return match[1];
+  return value;
+}
+
+// Detect if a parsed CSV looks like a Goodreads export based on header names
+function isGoodreadsFormat(headers) {
+  const goodreadsHeaders = ['book_id', 'exclusive_shelf', 'bookshelves', 'my_rating', 'average_rating', 'author_l-f'];
+  return goodreadsHeaders.filter(h => headers.includes(h)).length >= 3;
+}
+
 // Helper function to parse import file data
 function parseImportData(data, format) {
   let books = [];
@@ -166,12 +181,18 @@ function parseImportData(data, format) {
     };
 
     const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, '_'));
+    const goodreads = isGoodreadsFormat(headers);
 
     for (let i = 1; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]);
       const book = {};
       headers.forEach((header, index) => {
-        book[header] = values[index] || '';
+        let val = values[index] || '';
+        // Clean Goodreads ="..." ISBN format
+        if (goodreads && (header === 'isbn' || header === 'isbn13')) {
+          val = cleanGoodreadsValue(val);
+        }
+        book[header] = val;
       });
       books.push(book);
     }
@@ -201,7 +222,14 @@ function parseImportData(data, format) {
 function normalizeBookFields(book) {
   const title = book.title || book.book_title || book.name || '';
   const author = book.author || book.authors || book.book_author || '';
-  const isbn = String(book.isbn || book.isbn13 || book.isbn_13 || book.isbn10 || book.isbn_10 || '').replace(/[-\s]/g, '');
+
+  // Handle Goodreads ISBN format — prefer isbn13, clean ="..." wrapper
+  let rawIsbn = book.isbn13 || book.isbn_13 || book.isbn || book.isbn10 || book.isbn_10 || '';
+  rawIsbn = String(rawIsbn);
+  // Strip Goodreads ="..." wrapper if still present
+  rawIsbn = rawIsbn.replace(/^="?(.*?)"?$/, '$1');
+  const isbn = rawIsbn.replace(/[-\s]/g, '');
+
   const pageCount = parseInt(book.page_count || book.pages || book.num_pages || book.number_of_pages || '', 10) || null;
   const genre = book.genre || book.genres || book.category || '';
   const synopsis = book.synopsis || book.description || book.summary || '';
@@ -214,26 +242,40 @@ function normalizeBookFields(book) {
       tags = book.tags.split(/[,;]/).map(t => t.trim()).filter(t => t);
     }
   }
+  // Goodreads: use bookshelves as tags if no tags provided
+  if (tags.length === 0 && book.bookshelves) {
+    tags = String(book.bookshelves).split(/[,;]/).map(t => t.trim()).filter(t => t);
+  }
 
   const seriesName = book.series_name || book.series || '';
   const seriesPosition = parseFloat(book.series_position || book.series_number || book.book_number || '') || null;
 
-  let readingStatus = (book.reading_status || book.status || book.read_status || '').toLowerCase();
+  // Goodreads uses "exclusive_shelf" for reading status
+  let readingStatus = (book.reading_status || book.status || book.read_status || book.exclusive_shelf || '').toLowerCase().trim();
   if (readingStatus === 'read' || readingStatus === 'finished' || readingStatus === 'completed') {
     readingStatus = 'read';
-  } else if (readingStatus === 'reading' || readingStatus === 'currently_reading' || readingStatus === 'in_progress') {
+  } else if (readingStatus === 'reading' || readingStatus === 'currently_reading' || readingStatus === 'in_progress' || readingStatus === 'currently-reading') {
     readingStatus = 'reading';
+  } else if (readingStatus === 'to-read' || readingStatus === 'to_read') {
+    readingStatus = 'unread';
   } else {
     readingStatus = 'unread';
   }
 
+  // Goodreads uses YYYY/MM/DD date format
   let dateFinished = book.date_finished || book.date_read || book.finished_date || book.read_date || book.date_completed || '';
   if (dateFinished) {
-    const parsedDate = new Date(dateFinished);
-    if (!isNaN(parsedDate.getTime())) {
-      dateFinished = parsedDate.toISOString().split('T')[0];
+    // Normalize Goodreads YYYY/MM/DD to YYYY-MM-DD
+    const slashMatch = String(dateFinished).match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+    if (slashMatch) {
+      dateFinished = `${slashMatch[1]}-${slashMatch[2]}-${slashMatch[3]}`;
     } else {
-      dateFinished = null;
+      const parsedDate = new Date(dateFinished);
+      if (!isNaN(parsedDate.getTime())) {
+        dateFinished = parsedDate.toISOString().split('T')[0];
+      } else {
+        dateFinished = null;
+      }
     }
   } else {
     dateFinished = null;

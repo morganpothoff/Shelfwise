@@ -257,6 +257,7 @@ export default function ImportBooksModal({ onClose, onImportComplete }) {
 
       <div className="mt-4 p-4 bg-theme-secondary rounded-lg">
         <p className="text-xs text-theme-muted">
+          Supports Goodreads CSV exports and custom files.
           Each book will be searched by title and author to find its ISBN, then full metadata (synopsis, page count, series info) will be fetched—just like scanning a book.
           Books that can't be found can be added with only basic info or skipped.
         </p>

@@ -294,7 +294,9 @@ export default function ImportCompletedBooksModal({ onClose, onImportComplete })
 
       <div className="mt-4 p-4 bg-theme-secondary rounded-lg">
         <p className="text-xs text-theme-muted">
-          Import books you've read. If a book is already in your library, it will be marked as read.
+          Supports Goodreads CSV exports and custom files.
+          Import books you've read. Goodreads exports will automatically filter to only books on your "read" shelf.
+          If a book is already in your library, it will be marked as read.
           Include an "owned" column with "yes" to add books to your library.
         </p>
         <p className="text-xs text-theme-muted mt-2">
@@ -373,6 +375,15 @@ export default function ImportCompletedBooksModal({ onClose, onImportComplete })
           </div>
         )}
       </div>
+
+      {/* Goodreads shelf filter info */}
+      {parseResults.skippedShelves > 0 && (
+        <div className="mb-4 p-3 bg-theme-secondary rounded-lg">
+          <p className="text-xs text-theme-muted">
+            {parseResults.skippedShelves} books on other Goodreads shelves (to-read, currently-reading) were excluded. Only books on your "read" shelf are shown here.
+          </p>
+        </div>
+      )}
 
       {/* Library updates - books already in library that will be marked as read */}
       {parseResults.results.libraryUpdates.length > 0 && (
