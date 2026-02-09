@@ -412,6 +412,10 @@ export function deleteUser(userId) {
   // Delete any reading history for this user
   db.prepare('DELETE FROM reading_history WHERE user_id = ?').run(userId);
 
+  // Delete all friendships and friend requests for this user
+  db.prepare('DELETE FROM friendships WHERE user_id = ? OR friend_id = ?').run(userId, userId);
+  db.prepare('DELETE FROM friend_requests WHERE from_user_id = ? OR to_user_id = ?').run(userId, userId);
+
   // Delete the user record
   const result = db.prepare('DELETE FROM users WHERE id = ?').run(userId);
 
