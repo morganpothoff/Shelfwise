@@ -44,6 +44,54 @@ function cleanTags(tags) {
   return cleaned;
 }
 
+/**
+ * Clean synopsis to remove non-English content.
+ * Some book APIs return bilingual descriptions (e.g. English + French).
+ * This strips the non-English portion.
+ */
+function cleanSynopsis(synopsis) {
+  if (!synopsis || typeof synopsis !== 'string') return '';
+
+  let cleaned = synopsis;
+
+  // First, try to extract just the English section if the synopsis has explicit language markers
+  // e.g. "« In English: ... En Français: ... »"
+  const englishSectionMatch = cleaned.match(
+    /[«"]?\s*In\s+English\s*:\s*([\s\S]*?)(?:\s*[«"]?\s*(?:En\s+Fran[çc]ais|En\s+Espa[ñn]ol|Auf\s+Deutsch|In\s+Italiano|Em\s+Portugu[êe]s|In\s+French|In\s+Spanish|In\s+German|In\s+Italian|In\s+Portuguese)\s*:)/i
+  );
+  if (englishSectionMatch) {
+    cleaned = englishSectionMatch[1];
+  } else {
+    // No explicit "In English" section found — strip non-English sections from the end
+    // Patterns like "En Français:", "In French:", "En español:", "In Spanish:", etc.
+    const nonEnglishMarkers = [
+      /\n\s*[«"]?\s*En\s+Fran[çc]ais\s*:.*$/si,
+      /\n\s*[«"]?\s*In\s+French\s*:.*$/si,
+      /\n\s*[«"]?\s*En\s+Espa[ñn]ol\s*:.*$/si,
+      /\n\s*[«"]?\s*In\s+Spanish\s*:.*$/si,
+      /\n\s*[«"]?\s*En\s+Allemand\s*:.*$/si,
+      /\n\s*[«"]?\s*In\s+German\s*:.*$/si,
+      /\n\s*[«"]?\s*Auf\s+Deutsch\s*:.*$/si,
+      /\n\s*[«"]?\s*In\s+Italiano\s*:.*$/si,
+      /\n\s*[«"]?\s*In\s+Italian\s*:.*$/si,
+      /\n\s*[«"]?\s*Em\s+Portugu[êe]s\s*:.*$/si,
+      /\n\s*[«"]?\s*In\s+Portuguese\s*:.*$/si,
+    ];
+
+    for (const marker of nonEnglishMarkers) {
+      cleaned = cleaned.replace(marker, '');
+    }
+  }
+
+  // Strip any remaining "In English:" prefix that may be left over
+  cleaned = cleaned.replace(/^\s*[«"]?\s*In\s+English\s*:\s*/i, '');
+
+  // Clean up leading/trailing whitespace, quotes, and guillemets
+  cleaned = cleaned.replace(/^[\s«"]+/, '').replace(/[\s»"]+$/, '').trim();
+
+  return cleaned;
+}
+
 export async function lookupISBN(isbn) {
   // Clean the ISBN (remove dashes and spaces)
   const cleanIsbn = isbn.replace(/[-\s]/g, '');
@@ -180,7 +228,10 @@ export async function searchByTitleAuthor(title, author, isbn = null) {
     ? googleBooksData : null;
 
   // Determine the best ISBN to use (only from matching results)
-  const foundIsbn = isbn || openLibraryMatch?.isbn || googleBooksMatch?.isbn;
+  // Prefer English ISBNs found by search APIs over the provided ISBN,
+  // which may be a foreign edition (e.g. from Goodreads imports)
+  const searchIsbn = openLibraryMatch?.isbn || googleBooksMatch?.isbn;
+  const foundIsbn = searchIsbn || isbn;
 
   // If we have an ISBN, try to get additional data via ISBN lookup
   let isbnLookupData = null;
@@ -230,13 +281,16 @@ export async function searchByTitleAuthor(title, author, isbn = null) {
     }
   }
 
+  // Clean synopsis to remove non-English content
+  const rawSynopsis = isbnLookupData?.synopsis || openLibraryMatch?.synopsis || googleBooksMatch?.synopsis || '';
+
   const mergedData = {
     isbn: foundIsbn,
     title: finalTitle,
     author: finalAuthor,
     page_count: isbnLookupData?.page_count || openLibraryMatch?.page_count || googleBooksMatch?.page_count || null,
     genre: isbnLookupData?.genre || openLibraryMatch?.genre || googleBooksMatch?.genre || '',
-    synopsis: isbnLookupData?.synopsis || openLibraryMatch?.synopsis || googleBooksMatch?.synopsis || '',
+    synopsis: cleanSynopsis(rawSynopsis),
     tags: isbnLookupData?.tags || openLibraryMatch?.tags || googleBooksMatch?.tags || '[]',
     series_name: seriesName,
     series_position: seriesPosition
@@ -759,7 +813,7 @@ async function searchOpenLibrary(title, author) {
       author: bestMatch.author_name?.join(', ') || author,
       page_count: bestMatch.number_of_pages_median || null,
       genre: bestMatch.subject?.slice(0, 3).join(', ') || '',
-      synopsis: synopsis,
+      synopsis: cleanSynopsis(synopsis),
       tags: JSON.stringify(cleanTags(bestMatch.subject?.slice(0, 10) || [])),
       series_name: seriesInfo.series_name,
       series_position: seriesInfo.series_position
@@ -830,7 +884,7 @@ async function searchGoogleBooks(title, author) {
       author: volumeInfo.authors?.join(', ') || author,
       page_count: volumeInfo.pageCount || null,
       genre: volumeInfo.categories?.join(', ') || '',
-      synopsis: volumeInfo.description || '',
+      synopsis: cleanSynopsis(volumeInfo.description || ''),
       tags: JSON.stringify(cleanTags(volumeInfo.categories || [])),
       series_name: seriesInfo.series_name,
       series_position: seriesInfo.series_position
@@ -883,7 +937,7 @@ async function fetchFromOpenLibrary(isbn) {
     const workData = await getWorkDataFromOpenLibrary(workKey);
 
     // Fallback to notes/excerpts if no description from work
-    const synopsis = workData.description || bookData.notes || bookData.excerpts?.[0]?.text || '';
+    const rawSynopsis = workData.description || bookData.notes || bookData.excerpts?.[0]?.text || '';
 
     // Determine series info - use work data first, then fall back to book subjects
     let seriesName = workData.series_name;
@@ -904,7 +958,7 @@ async function fetchFromOpenLibrary(isbn) {
       author: bookData.authors?.map(a => a.name).join(', ') || '',
       page_count: bookData.number_of_pages || null,
       genre: bookData.subjects?.slice(0, 3).map(s => s.name).join(', ') || '',
-      synopsis: synopsis,
+      synopsis: cleanSynopsis(rawSynopsis),
       tags: JSON.stringify(cleanTags(bookData.subjects?.slice(0, 10).map(s => s.name) || [])),
       series_name: seriesName,
       series_position: seriesPosition
@@ -940,7 +994,7 @@ async function fetchFromGoogleBooks(isbn) {
       author: volumeInfo.authors?.join(', ') || '',
       page_count: volumeInfo.pageCount || null,
       genre: volumeInfo.categories?.join(', ') || '',
-      synopsis: volumeInfo.description || '',
+      synopsis: cleanSynopsis(volumeInfo.description || ''),
       tags: JSON.stringify(cleanTags(volumeInfo.categories || [])),
       series_name: seriesInfo.series_name,
       series_position: seriesInfo.series_position
