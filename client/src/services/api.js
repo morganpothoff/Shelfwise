@@ -697,3 +697,103 @@ export async function confirmCompletedBooksImport(booksToImport, libraryUpdates 
 
   return result;
 }
+
+// ============ FRIENDS API ============
+
+export async function sendFriendRequest(email) {
+  const response = await fetchWithCredentials(`${API_BASE}/friends/request`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to send friend request');
+  }
+
+  return data;
+}
+
+export async function getFriendRequests() {
+  const response = await fetchWithCredentials(`${API_BASE}/friends/requests`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch friend requests');
+  }
+
+  return response.json();
+}
+
+export async function getFriendRequestCount() {
+  const response = await fetchWithCredentials(`${API_BASE}/friends/requests/count`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch request count');
+  }
+
+  return response.json();
+}
+
+export async function acceptFriendRequest(requestId) {
+  const response = await fetchWithCredentials(`${API_BASE}/friends/requests/${requestId}/accept`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to accept friend request');
+  }
+
+  return data;
+}
+
+export async function declineFriendRequest(requestId) {
+  const response = await fetchWithCredentials(`${API_BASE}/friends/requests/${requestId}/decline`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to decline friend request');
+  }
+
+  return data;
+}
+
+export async function getFriends(search = '') {
+  const params = search ? `?search=${encodeURIComponent(search)}` : '';
+  const response = await fetchWithCredentials(`${API_BASE}/friends${params}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch friends');
+  }
+
+  return response.json();
+}
+
+export async function getFriendCount() {
+  const response = await fetchWithCredentials(`${API_BASE}/friends/count`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch friend count');
+  }
+
+  return response.json();
+}
+
+export async function unfriend(friendId) {
+  const response = await fetchWithCredentials(`${API_BASE}/friends/${friendId}`, {
+    method: 'DELETE',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to remove friend');
+  }
+
+  return data;
+}

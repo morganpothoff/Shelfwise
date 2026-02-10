@@ -15,6 +15,7 @@ import AnalyzeMe from './components/AnalyzeMe';
 import BookProfile from './components/BookProfile';
 import BooksCompleted from './components/BooksCompleted';
 import CompletedBookProfile from './components/CompletedBookProfile';
+import FriendsPage from './components/FriendsPage';
 
 // Loading spinner component
 function LoadingScreen() {
@@ -109,6 +110,14 @@ function App() {
         element={
           <ProtectedRoute>
             <UserProfile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/friends"
+        element={
+          <ProtectedRoute>
+            <FriendsPage />
           </ProtectedRoute>
         }
       />

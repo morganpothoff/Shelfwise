@@ -93,6 +93,27 @@ db.exec(`
     UNIQUE(book_id, user_id)
   );
 
+  CREATE TABLE IF NOT EXISTS friend_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(from_user_id, to_user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS friendships (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    friend_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, friend_id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
@@ -104,6 +125,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_books_completed_title ON books_completed(title);
   CREATE INDEX IF NOT EXISTS idx_completed_book_ratings_book_id ON completed_book_ratings(book_id);
   CREATE INDEX IF NOT EXISTS idx_completed_book_ratings_user_id ON completed_book_ratings(user_id);
+  CREATE INDEX IF NOT EXISTS idx_friend_requests_from_user ON friend_requests(from_user_id);
+  CREATE INDEX IF NOT EXISTS idx_friend_requests_to_user ON friend_requests(to_user_id);
+  CREATE INDEX IF NOT EXISTS idx_friend_requests_status ON friend_requests(status);
+  CREATE INDEX IF NOT EXISTS idx_friendships_user_id ON friendships(user_id);
+  CREATE INDEX IF NOT EXISTS idx_friendships_friend_id ON friendships(friend_id);
 `);
 
 console.log('Database setup complete!');
