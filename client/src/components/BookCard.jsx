@@ -46,6 +46,16 @@ export default function BookCard({ book, onDelete, onEditSeries, showSeriesPosit
       )}
 
       <div className="flex flex-wrap gap-2 mb-3">
+        {book.visibility === 'hidden' && (
+          <span className="text-xs px-2 py-1 rounded font-medium bg-red-100 text-red-800">
+            🔒 Hidden
+          </span>
+        )}
+        {book.visibility === 'not_available' && (
+          <span className="text-xs px-2 py-1 rounded font-medium bg-orange-100 text-orange-800">
+            Not Available
+          </span>
+        )}
         {book.reading_status && book.reading_status !== 'unread' && (
           <span className={`text-xs px-2 py-1 rounded font-medium ${
             book.reading_status === 'read'

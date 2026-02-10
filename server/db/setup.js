@@ -43,6 +43,7 @@ db.exec(`
     series_name TEXT,
     series_position REAL,
     reading_status TEXT DEFAULT 'unread',
+    visibility TEXT DEFAULT 'visible',
     date_finished DATE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

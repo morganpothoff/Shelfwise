@@ -788,7 +788,7 @@ router.post('/scan', validateISBNScan, async (req, res) => {
 router.put('/:id', validateIdParam, validateBook, (req, res) => {
   try {
     const userId = req.user.id;
-    const { title, author, page_count, genre, synopsis, tags, series_name, series_position, reading_status, date_finished } = req.body;
+    const { title, author, page_count, genre, synopsis, tags, series_name, series_position, reading_status, date_finished, visibility } = req.body;
     const bookId = req.params.id;
 
     const existing = db.prepare('SELECT * FROM books WHERE id = ? AND user_id = ?').get(bookId, userId);
@@ -802,10 +802,17 @@ router.put('/:id', validateIdParam, validateBook, (req, res) => {
       return res.status(400).json({ error: 'Invalid reading status. Must be: unread, reading, or read' });
     }
 
+    // Validate visibility if provided
+    const validVisibilities = ['visible', 'hidden', 'not_available'];
+    if (visibility && !validVisibilities.includes(visibility)) {
+      return res.status(400).json({ error: 'Invalid visibility. Must be: visible, hidden, or not_available' });
+    }
+
     const stmt = db.prepare(`
       UPDATE books
       SET title = ?, author = ?, page_count = ?, genre = ?, synopsis = ?, tags = ?,
-          series_name = ?, series_position = ?, reading_status = ?, date_finished = ?, updated_at = CURRENT_TIMESTAMP
+          series_name = ?, series_position = ?, reading_status = ?, date_finished = ?,
+          visibility = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
     `);
 
@@ -819,6 +826,7 @@ router.put('/:id', validateIdParam, validateBook, (req, res) => {
     const finalTags = Array.isArray(tags) ? JSON.stringify(tags) : tags ?? existing.tags;
     const finalSeriesName = series_name !== undefined ? series_name : existing.series_name;
     const finalSeriesPosition = series_position !== undefined ? series_position : existing.series_position;
+    const finalVisibility = visibility !== undefined ? visibility : (existing.visibility || 'visible');
 
     stmt.run(
       finalTitle,
@@ -831,6 +839,7 @@ router.put('/:id', validateIdParam, validateBook, (req, res) => {
       finalSeriesPosition,
       finalReadingStatus,
       finalDateFinished,
+      finalVisibility,
       bookId,
       userId
     );

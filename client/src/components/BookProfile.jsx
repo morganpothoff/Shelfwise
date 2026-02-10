@@ -62,6 +62,9 @@ export default function BookProfile() {
   const [dateFinished, setDateFinished] = useState('');
   const [readingStatusLoading, setReadingStatusLoading] = useState(false);
 
+  // Visibility state
+  const [visibilityLoading, setVisibilityLoading] = useState(false);
+
   useEffect(() => {
     loadBook();
   }, [id]);
@@ -196,6 +199,28 @@ export default function BookProfile() {
     setEditingReadingStatus(false);
     setReadingStatus(book.reading_status || 'unread');
     setDateFinished(book.date_finished || '');
+  };
+
+  const handleVisibilityChange = async (newVisibility) => {
+    try {
+      setVisibilityLoading(true);
+      const updatedBook = await updateBook(id, { visibility: newVisibility });
+      setBook(updatedBook);
+      setActionMessage({ type: 'success', text: 'Visibility updated' });
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err.message });
+    } finally {
+      setVisibilityLoading(false);
+    }
+  };
+
+  const getVisibilityDisplay = (visibility) => {
+    switch (visibility) {
+      case 'hidden': return { label: 'Hidden from Friends', color: 'bg-red-100 text-red-800', icon: '🔒' };
+      case 'not_available': return { label: 'Not Available', color: 'bg-orange-100 text-orange-800', icon: '🚫' };
+      default: return { label: 'Visible to Friends', color: 'bg-green-100 text-green-800', icon: '👁' };
+    }
   };
 
   const getReadingStatusDisplay = (status) => {
@@ -424,6 +449,38 @@ export default function BookProfile() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Friend Visibility */}
+            <div className="border-t border-theme pt-6">
+              <h2 className="text-sm font-semibold text-theme-muted uppercase tracking-wide mb-3">Friend Visibility</h2>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { value: 'visible', label: 'Visible', desc: 'Friends can see this book' },
+                  { value: 'not_available', label: 'Not Available', desc: 'Visible but marked as not available' },
+                  { value: 'hidden', label: 'Hidden', desc: 'Hidden from friends entirely' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleVisibilityChange(option.value)}
+                    disabled={visibilityLoading}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                      (book.visibility || 'visible') === option.value
+                        ? 'bg-theme-accent text-theme-on-primary'
+                        : 'bg-theme-secondary text-theme-primary hover:bg-theme-accent/20'
+                    }`}
+                    title={option.desc}
+                  >
+                    {getVisibilityDisplay(option.value).icon} {option.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-theme-muted mt-2">
+                {getVisibilityDisplay(book.visibility || 'visible').icon}{' '}
+                {(book.visibility || 'visible') === 'visible' && 'This book is visible to your friends.'}
+                {book.visibility === 'not_available' && 'Friends can see this book but it is marked as not available.'}
+                {book.visibility === 'hidden' && 'This book is completely hidden from your friends.'}
+              </p>
             </div>
 
             {/* Synopsis */}

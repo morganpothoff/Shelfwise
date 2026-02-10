@@ -19,6 +19,16 @@ export default function BookListItem({ book, onDelete, onEditSeries, showSeriesP
           <Link to={`/book/${book.id}`} className="font-medium text-theme-primary hover:text-theme-accent transition-colors">
             {book.title}
           </Link>
+          {book.visibility === 'hidden' && (
+            <span className="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 bg-red-100 text-red-800">
+              🔒
+            </span>
+          )}
+          {book.visibility === 'not_available' && (
+            <span className="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 bg-orange-100 text-orange-800">
+              N/A
+            </span>
+          )}
           {book.reading_status && book.reading_status !== 'unread' && (
             <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
               book.reading_status === 'read'
