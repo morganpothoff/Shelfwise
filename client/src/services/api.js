@@ -798,6 +798,7 @@ export async function unfriend(friendId) {
   return data;
 }
 
+
 export async function getFriendBooks(friendId) {
   const response = await fetchWithCredentials(`${API_BASE}/friends/${friendId}/books`);
 

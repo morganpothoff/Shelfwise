@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getFriendCount } from '../services/api';
 import Navbar from './Navbar';
 import DeleteAccountModal from './DeleteAccountModal';
 
@@ -13,6 +15,19 @@ export default function UserProfile() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [friendCount, setFriendCount] = useState(0);
+
+  useEffect(() => {
+    async function loadFriendCount() {
+      try {
+        const data = await getFriendCount();
+        setFriendCount(data.count);
+      } catch (err) {
+        console.error('Failed to load friend count:', err);
+      }
+    }
+    loadFriendCount();
+  }, []);
 
   async function handleNameSubmit(e) {
     e.preventDefault();
@@ -128,6 +143,12 @@ export default function UserProfile() {
                   </span>
                 )}
               </div>
+              <Link to="/friends" className="flex items-center gap-1 text-sm text-theme-accent hover:underline mt-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                </svg>
+                <span>{friendCount} {friendCount === 1 ? 'Friend' : 'Friends'}</span>
+              </Link>
             </div>
           </div>
         </div>

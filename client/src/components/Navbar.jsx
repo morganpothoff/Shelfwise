@@ -172,6 +172,9 @@ export default function Navbar() {
                     </span>
                   </Link>
 
+                  {/* Notification bell */}
+                  <NotificationBell />
+
                   {/* Theme button */}
                   <button
                     onClick={() => setShowThemeSelector(true)}
@@ -283,6 +286,21 @@ export default function Navbar() {
               {isAuthenticated && (
                 <>
                   <div className="border-t border-theme my-2" />
+
+                  <Link
+                    to="/friends"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      isActive('/friends')
+                        ? 'bg-theme-accent/10 text-theme-accent font-medium'
+                        : 'text-theme-secondary hover:bg-theme-secondary'
+                    }`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                    </svg>
+                    <span>Notifications</span>
+                  </Link>
 
                   <Link
                     to="/profile"
