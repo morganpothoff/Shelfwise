@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import booksRouter from './routes/books.js';
 import completedBooksRouter from './routes/completedBooks.js';
+import friendsRouter from './routes/friends.js';
 import authRouter from './routes/auth.js';
 import { requireAuth } from './middleware/auth.js';
 import { cleanExpiredSessions } from './services/auth.js';
@@ -81,6 +82,9 @@ app.use('/api/books', requireAuth, booksRouter);
 
 // Completed books routes require authentication
 app.use('/api/completed-books', requireAuth, completedBooksRouter);
+
+// Friends routes require authentication
+app.use('/api/friends', requireAuth, friendsRouter);
 
 // Health check (public)
 app.get('/api/health', (req, res) => {
