@@ -17,6 +17,7 @@ import BooksCompleted from './components/BooksCompleted';
 import CompletedBookProfile from './components/CompletedBookProfile';
 import FriendsPage from './components/FriendsPage';
 import FriendLibrary from './components/FriendLibrary';
+import BorrowPage from './components/BorrowPage';
 
 // Loading spinner component
 function LoadingScreen() {
@@ -127,6 +128,14 @@ function App() {
         element={
           <ProtectedRoute>
             <FriendLibrary />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/borrows"
+        element={
+          <ProtectedRoute>
+            <BorrowPage />
           </ProtectedRoute>
         }
       />

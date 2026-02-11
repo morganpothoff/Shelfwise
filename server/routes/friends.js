@@ -246,15 +246,24 @@ router.get('/:friendId/books', (req, res) => {
     // Get friend's books, excluding hidden ones
     const books = db.prepare(
       `SELECT id, isbn, title, author, page_count, genre, synopsis, tags,
-              series_name, series_position, reading_status, visibility, created_at
+              series_name, series_position, reading_status, visibility,
+              borrow_status, borrowed_by_user_id, created_at
        FROM books
        WHERE user_id = ? AND (visibility IS NULL OR visibility != 'hidden')
        ORDER BY created_at DESC`
     ).all(friendId);
 
+    // Get pending borrow requests by the current user for this friend's books
+    const pendingRequests = db.prepare(
+      `SELECT book_id FROM borrow_requests
+       WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'`
+    ).all(userId, friendId);
+    const pendingBookIds = new Set(pendingRequests.map(r => r.book_id));
+
     const parsedBooks = books.map(book => ({
       ...book,
-      tags: book.tags ? JSON.parse(book.tags) : []
+      tags: book.tags ? JSON.parse(book.tags) : [],
+      requestPending: pendingBookIds.has(book.id)
     }));
 
     res.json({

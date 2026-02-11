@@ -44,6 +44,8 @@ db.exec(`
     series_position REAL,
     reading_status TEXT DEFAULT 'unread',
     visibility TEXT DEFAULT 'visible',
+    borrowed_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    borrow_status TEXT DEFAULT NULL,
     date_finished DATE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -115,6 +117,19 @@ db.exec(`
     UNIQUE(user_id, friend_id)
   );
 
+  CREATE TABLE IF NOT EXISTS borrow_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    book_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+  );
+
   CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
@@ -131,6 +146,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_friend_requests_status ON friend_requests(status);
   CREATE INDEX IF NOT EXISTS idx_friendships_user_id ON friendships(user_id);
   CREATE INDEX IF NOT EXISTS idx_friendships_friend_id ON friendships(friend_id);
+  CREATE INDEX IF NOT EXISTS idx_borrow_requests_from_user ON borrow_requests(from_user_id);
+  CREATE INDEX IF NOT EXISTS idx_borrow_requests_to_user ON borrow_requests(to_user_id);
+  CREATE INDEX IF NOT EXISTS idx_borrow_requests_book_id ON borrow_requests(book_id);
+  CREATE INDEX IF NOT EXISTS idx_borrow_requests_status ON borrow_requests(status);
 `);
 
 console.log('Database setup complete!');

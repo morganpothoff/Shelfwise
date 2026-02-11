@@ -809,3 +809,136 @@ export async function getFriendBooks(friendId) {
 
   return response.json();
 }
+
+// ============ BORROW API ============
+
+export async function sendBorrowRequest(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/request`, {
+    method: 'POST',
+    body: JSON.stringify({ bookId }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to send borrow request');
+  }
+
+  return data;
+}
+
+export async function getBorrowRequests() {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/requests`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch borrow requests');
+  }
+
+  return response.json();
+}
+
+export async function getBorrowRequestCount() {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/requests/count`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch borrow request count');
+  }
+
+  return response.json();
+}
+
+export async function acceptBorrowRequest(requestId) {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/requests/${requestId}/accept`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to accept borrow request');
+  }
+
+  return data;
+}
+
+export async function declineBorrowRequest(requestId) {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/requests/${requestId}/decline`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to decline borrow request');
+  }
+
+  return data;
+}
+
+export async function getLendingBooks() {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/lending`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch lending books');
+  }
+
+  return response.json();
+}
+
+export async function getBorrowingBooks() {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/borrowing`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch borrowing books');
+  }
+
+  return response.json();
+}
+
+export async function requestReturn(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/${bookId}/request-return`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to request return');
+  }
+
+  return data;
+}
+
+export async function acknowledgeReturn(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/${bookId}/acknowledge-return`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to acknowledge return');
+  }
+
+  return data;
+}
+
+export async function getReturnRequests() {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/return-requests`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch return requests');
+  }
+
+  return response.json();
+}
+
+export async function getReturnRequestCount() {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/return-requests/count`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch return request count');
+  }
+
+  return response.json();
+}
