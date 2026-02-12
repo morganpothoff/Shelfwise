@@ -483,6 +483,35 @@ export default function BookProfile() {
               </p>
             </div>
 
+            {/* Borrow Status */}
+            {book.borrow_status && (
+              <div className="border-t border-theme pt-6">
+                <h2 className="text-sm font-semibold text-theme-muted uppercase tracking-wide mb-3">Borrow Status</h2>
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+                    book.borrow_status === 'borrowed'
+                      ? 'bg-purple-100 text-purple-800'
+                      : book.borrow_status === 'borrower_returning'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {book.borrow_status === 'borrowed' ? 'Borrowed' : book.borrow_status === 'borrower_returning' ? 'Being Returned' : 'Return Requested'}
+                  </span>
+                  {book.borrower && (
+                    <span className="text-sm text-theme-primary">
+                      by{' '}
+                      <Link
+                        to={`/friends/${book.borrower.id}/library`}
+                        className="text-theme-accent hover:underline font-medium"
+                      >
+                        {book.borrower.name || book.borrower.email}
+                      </Link>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Synopsis */}
             {book.synopsis && (
               <div>

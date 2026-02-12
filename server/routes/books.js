@@ -609,6 +609,13 @@ router.get('/:id', validateIdParam, (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
     book.tags = book.tags ? JSON.parse(book.tags) : [];
+
+    // Include borrower info if book is currently borrowed
+    if (book.borrowed_by_user_id) {
+      const borrower = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(book.borrowed_by_user_id);
+      book.borrower = borrower || null;
+    }
+
     res.json(book);
   } catch (error) {
     handleError(res, error, 'Failed to fetch book');

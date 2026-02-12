@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Navbar from './Navbar';
-import { getFriendBooks } from '../services/api';
+import { getFriendBooks, sendBorrowRequest } from '../services/api';
 
 export default function FriendLibrary() {
   const { friendId } = useParams();
@@ -10,6 +10,7 @@ export default function FriendLibrary() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [requestedBookIds, setRequestedBookIds] = useState(new Set());
 
   useEffect(() => {
     loadFriendBooks();
@@ -22,10 +23,17 @@ export default function FriendLibrary() {
       const data = await getFriendBooks(friendId);
       setFriend(data.friend);
       setBooks(data.books);
+      // Track books that already have pending requests
+      const pendingIds = new Set(data.books.filter(b => b.requestPending).map(b => b.id));
+      setRequestedBookIds(pendingIds);
     } catch (err) {
       setError(err.message);
     }
     setLoading(false);
+  }
+
+  function handleBorrowRequestSent(bookId) {
+    setRequestedBookIds(prev => new Set([...prev, bookId]));
   }
 
   const filteredBooks = useMemo(() => {
@@ -156,7 +164,14 @@ export default function FriendLibrary() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {seriesBooks.map(book => (
-                    <FriendBookCard key={book.id} book={book} showSeriesPosition={true} />
+                    <FriendBookCard
+                      key={book.id}
+                      book={book}
+                      friend={friend}
+                      showSeriesPosition={true}
+                      isRequested={requestedBookIds.has(book.id)}
+                      onBorrowRequestSent={handleBorrowRequestSent}
+                    />
                   ))}
                 </div>
               </div>
@@ -170,7 +185,14 @@ export default function FriendLibrary() {
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {groupedBooks.standalone.map(book => (
-                    <FriendBookCard key={book.id} book={book} showSeriesPosition={false} />
+                    <FriendBookCard
+                      key={book.id}
+                      book={book}
+                      friend={friend}
+                      showSeriesPosition={false}
+                      isRequested={requestedBookIds.has(book.id)}
+                      onBorrowRequestSent={handleBorrowRequestSent}
+                    />
                   ))}
                 </div>
               </div>
@@ -182,7 +204,28 @@ export default function FriendLibrary() {
   );
 }
 
-function FriendBookCard({ book, showSeriesPosition }) {
+function FriendBookCard({ book, friend, showSeriesPosition, isRequested, onBorrowRequestSent }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [borrowLoading, setBorrowLoading] = useState(false);
+  const [borrowMessage, setBorrowMessage] = useState(null);
+
+  const canBorrow = book.visibility !== 'not_available' && !book.borrow_status && !isRequested;
+
+  async function handleBorrowRequest() {
+    setBorrowLoading(true);
+    setBorrowMessage(null);
+    try {
+      await sendBorrowRequest(book.id);
+      onBorrowRequestSent(book.id);
+      setShowConfirm(false);
+      setBorrowMessage({ type: 'success', text: 'Request sent!' });
+      setTimeout(() => setBorrowMessage(null), 3000);
+    } catch (err) {
+      setBorrowMessage({ type: 'error', text: err.message });
+    }
+    setBorrowLoading(false);
+  }
+
   return (
     <div className="bg-theme-card rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow relative">
       <div className="flex items-start gap-2 mb-1">
@@ -206,13 +249,33 @@ function FriendBookCard({ book, showSeriesPosition }) {
             Not Available
           </span>
         )}
+        {book.borrow_status === 'borrowed' && (
+          <span className="text-xs px-2 py-1 rounded font-medium bg-purple-100 text-purple-800">
+            Currently Borrowed
+          </span>
+        )}
+        {book.borrow_status === 'return_requested' && (
+          <span className="text-xs px-2 py-1 rounded font-medium bg-yellow-100 text-yellow-800">
+            Return Requested
+          </span>
+        )}
+        {book.borrow_status === 'borrower_returning' && (
+          <span className="text-xs px-2 py-1 rounded font-medium bg-green-100 text-green-800">
+            Being Returned
+          </span>
+        )}
+        {isRequested && !book.borrow_status && (
+          <span className="text-xs px-2 py-1 rounded font-medium bg-blue-100 text-blue-800">
+            Request Pending
+          </span>
+        )}
         {book.reading_status && book.reading_status !== 'unread' && (
           <span className={`text-xs px-2 py-1 rounded font-medium ${
             book.reading_status === 'read'
               ? 'bg-green-100 text-green-800'
               : 'bg-blue-100 text-blue-800'
           }`}>
-            {book.reading_status === 'read' ? '✓ Read' : '📖 Reading'}
+            {book.reading_status === 'read' ? 'Read' : 'Reading'}
           </span>
         )}
         {book.page_count && (
@@ -234,7 +297,7 @@ function FriendBookCard({ book, showSeriesPosition }) {
       )}
 
       {book.tags && book.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 mb-3">
           {book.tags.slice(0, 5).map((tag, index) => (
             <span
               key={index}
@@ -252,7 +315,51 @@ function FriendBookCard({ book, showSeriesPosition }) {
       )}
 
       {book.isbn && (
-        <p className="text-xs text-theme-muted mt-3">ISBN: {book.isbn}</p>
+        <p className="text-xs text-theme-muted mb-3">ISBN: {book.isbn}</p>
+      )}
+
+      {/* Borrow message */}
+      {borrowMessage && (
+        <div className={`text-xs px-2 py-1 rounded mb-2 ${
+          borrowMessage.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        }`}>
+          {borrowMessage.text}
+        </div>
+      )}
+
+      {/* Borrow button */}
+      {canBorrow && !showConfirm && (
+        <button
+          onClick={() => setShowConfirm(true)}
+          className="w-full mt-1 px-3 py-2 text-sm font-medium bg-theme-accent text-theme-on-primary rounded-md hover:opacity-90 transition"
+        >
+          Request to Borrow
+        </button>
+      )}
+
+      {/* Confirm borrow modal */}
+      {showConfirm && (
+        <div className="mt-2 p-3 bg-theme-secondary rounded-lg border border-theme">
+          <p className="text-sm text-theme-primary mb-3">
+            Request to borrow <span className="font-semibold">"{book.title}"</span> from {friend?.name || friend?.email}?
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleBorrowRequest}
+              disabled={borrowLoading}
+              className="px-3 py-1.5 text-sm font-medium bg-theme-accent text-theme-on-primary rounded-md hover:opacity-90 transition disabled:opacity-50"
+            >
+              {borrowLoading ? 'Sending...' : 'Confirm'}
+            </button>
+            <button
+              onClick={() => setShowConfirm(false)}
+              disabled={borrowLoading}
+              className="px-3 py-1.5 text-sm font-medium text-theme-muted border border-theme rounded-md hover:bg-theme-card transition disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
