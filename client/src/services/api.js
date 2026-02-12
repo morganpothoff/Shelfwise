@@ -923,6 +923,54 @@ export async function acknowledgeReturn(bookId) {
   return data;
 }
 
+export async function initiateReturn(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/${bookId}/initiate-return`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to initiate return');
+  }
+
+  return data;
+}
+
+export async function confirmReturn(bookId) {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/${bookId}/confirm-return`, {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to confirm return');
+  }
+
+  return data;
+}
+
+export async function getIncomingReturns() {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/incoming-returns`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch incoming returns');
+  }
+
+  return response.json();
+}
+
+export async function getIncomingReturnCount() {
+  const response = await fetchWithCredentials(`${API_BASE}/borrow/incoming-returns/count`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch incoming return count');
+  }
+
+  return response.json();
+}
+
 export async function getReturnRequests() {
   const response = await fetchWithCredentials(`${API_BASE}/borrow/return-requests`);
 

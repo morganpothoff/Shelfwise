@@ -259,6 +259,11 @@ function FriendBookCard({ book, friend, showSeriesPosition, isRequested, onBorro
             Return Requested
           </span>
         )}
+        {book.borrow_status === 'borrower_returning' && (
+          <span className="text-xs px-2 py-1 rounded font-medium bg-green-100 text-green-800">
+            Being Returned
+          </span>
+        )}
         {isRequested && !book.borrow_status && (
           <span className="text-xs px-2 py-1 rounded font-medium bg-blue-100 text-blue-800">
             Request Pending

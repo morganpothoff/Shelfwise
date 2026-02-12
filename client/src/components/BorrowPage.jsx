@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar';
-import { getLendingBooks, getBorrowingBooks, requestReturn } from '../services/api';
+import { getLendingBooks, getBorrowingBooks, requestReturn, initiateReturn } from '../services/api';
 
 export default function BorrowPage() {
   const [activeTab, setActiveTab] = useState('lending');
@@ -41,6 +41,22 @@ export default function BorrowPage() {
         b.id === bookId ? { ...b, borrow_status: 'return_requested' } : b
       ));
       setActionMessage({ type: 'success', text: 'Return requested' });
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err.message });
+    }
+    setActionLoading(null);
+  }
+
+  async function handleInitiateReturn(bookId) {
+    setActionLoading(`return-${bookId}`);
+    setActionMessage(null);
+    try {
+      await initiateReturn(bookId);
+      setBorrowingBooks(prev => prev.map(b =>
+        b.id === bookId ? { ...b, borrow_status: 'borrower_returning' } : b
+      ));
+      setActionMessage({ type: 'success', text: 'Return initiated! Waiting for the owner to confirm.' });
       setTimeout(() => setActionMessage(null), 3000);
     } catch (err) {
       setActionMessage({ type: 'error', text: err.message });
@@ -139,9 +155,11 @@ export default function BorrowPage() {
                       <span className={`text-xs px-2 py-1 rounded font-medium ${
                         book.borrow_status === 'borrowed'
                           ? 'bg-purple-100 text-purple-800'
+                          : book.borrow_status === 'borrower_returning'
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {book.borrow_status === 'borrowed' ? 'Borrowed' : 'Return Requested'}
+                        {book.borrow_status === 'borrowed' ? 'Borrowed' : book.borrow_status === 'borrower_returning' ? 'Being Returned' : 'Return Requested'}
                       </span>
                     </div>
 
@@ -168,6 +186,12 @@ export default function BorrowPage() {
                     {book.borrow_status === 'return_requested' && (
                       <p className="text-xs text-yellow-700 bg-yellow-50 px-3 py-2 rounded-md text-center">
                         Waiting for borrower to acknowledge return
+                      </p>
+                    )}
+
+                    {book.borrow_status === 'borrower_returning' && (
+                      <p className="text-xs text-green-700 bg-green-50 px-3 py-2 rounded-md text-center">
+                        Borrower is returning this book. Check your notifications to confirm.
                       </p>
                     )}
                   </div>
@@ -202,13 +226,15 @@ export default function BorrowPage() {
                       <span className={`text-xs px-2 py-1 rounded font-medium ${
                         book.borrow_status === 'borrowed'
                           ? 'bg-purple-100 text-purple-800'
+                          : book.borrow_status === 'borrower_returning'
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {book.borrow_status === 'borrowed' ? 'Borrowing' : 'Return Requested'}
+                        {book.borrow_status === 'borrowed' ? 'Borrowing' : book.borrow_status === 'borrower_returning' ? 'Returning' : 'Return Requested'}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm text-theme-muted">
+                    <div className="flex items-center gap-2 text-sm text-theme-muted mb-3">
                       <span>From</span>
                       <Link
                         to={`/friends/${book.owner_id}/library`}
@@ -218,9 +244,25 @@ export default function BorrowPage() {
                       </Link>
                     </div>
 
+                    {book.borrow_status === 'borrowed' && (
+                      <button
+                        onClick={() => handleInitiateReturn(book.id)}
+                        disabled={actionLoading === `return-${book.id}`}
+                        className="w-full px-3 py-2 text-sm font-medium bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50"
+                      >
+                        {actionLoading === `return-${book.id}` ? 'Returning...' : 'Return Book'}
+                      </button>
+                    )}
+
                     {book.borrow_status === 'return_requested' && (
-                      <p className="text-xs text-yellow-700 bg-yellow-50 px-3 py-2 rounded-md text-center mt-3">
+                      <p className="text-xs text-yellow-700 bg-yellow-50 px-3 py-2 rounded-md text-center">
                         The owner has requested this book back. Check your notifications to acknowledge the return.
+                      </p>
+                    )}
+
+                    {book.borrow_status === 'borrower_returning' && (
+                      <p className="text-xs text-green-700 bg-green-50 px-3 py-2 rounded-md text-center">
+                        Waiting for the owner to confirm the return.
                       </p>
                     )}
                   </div>

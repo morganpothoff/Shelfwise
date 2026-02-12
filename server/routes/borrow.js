@@ -311,6 +311,117 @@ router.post('/:bookId/acknowledge-return', (req, res) => {
   }
 });
 
+// POST /api/borrow/:bookId/initiate-return - Borrower initiates returning a book
+router.post('/:bookId/initiate-return', (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookId = parseInt(req.params.bookId, 10);
+
+    if (isNaN(bookId) || bookId < 1) {
+      return res.status(400).json({ error: 'Invalid book ID' });
+    }
+
+    const book = db.prepare(
+      "SELECT * FROM books WHERE id = ? AND borrowed_by_user_id = ? AND borrow_status = 'borrowed'"
+    ).get(bookId, userId);
+
+    if (!book) {
+      return res.status(404).json({ error: 'Borrowed book not found' });
+    }
+
+    const initiateTransaction = db.transaction(() => {
+      // Update book status
+      db.prepare("UPDATE books SET borrow_status = 'borrower_returning' WHERE id = ?")
+        .run(bookId);
+
+      // Update the corresponding borrow request
+      db.prepare(
+        `UPDATE borrow_requests SET status = 'borrower_returning', updated_at = CURRENT_TIMESTAMP
+         WHERE book_id = ? AND from_user_id = ? AND status = 'accepted'`
+      ).run(bookId, userId);
+    });
+
+    initiateTransaction();
+
+    res.json({ message: 'Return initiated' });
+  } catch (error) {
+    handleError(res, error, 'Failed to initiate return');
+  }
+});
+
+// POST /api/borrow/:bookId/confirm-return - Lender acknowledges the borrower's return
+router.post('/:bookId/confirm-return', (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookId = parseInt(req.params.bookId, 10);
+
+    if (isNaN(bookId) || bookId < 1) {
+      return res.status(400).json({ error: 'Invalid book ID' });
+    }
+
+    const book = db.prepare(
+      "SELECT * FROM books WHERE id = ? AND user_id = ? AND borrow_status = 'borrower_returning'"
+    ).get(bookId, userId);
+
+    if (!book) {
+      return res.status(404).json({ error: 'Return to confirm not found' });
+    }
+
+    const confirmTransaction = db.transaction(() => {
+      // Clear borrow status on the book
+      db.prepare("UPDATE books SET borrowed_by_user_id = NULL, borrow_status = NULL WHERE id = ?")
+        .run(bookId);
+
+      // Update the borrow request record
+      db.prepare(
+        `UPDATE borrow_requests SET status = 'returned', updated_at = CURRENT_TIMESTAMP
+         WHERE book_id = ? AND from_user_id = ? AND status = 'borrower_returning'`
+      ).run(bookId, book.borrowed_by_user_id);
+    });
+
+    confirmTransaction();
+
+    res.json({ message: 'Return confirmed' });
+  } catch (error) {
+    handleError(res, error, 'Failed to confirm return');
+  }
+});
+
+// GET /api/borrow/incoming-returns - Get borrower-initiated return notifications for lender
+router.get('/incoming-returns', (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const requests = db.prepare(`
+      SELECT br.id, br.from_user_id, br.book_id, br.status, br.updated_at,
+             u.email as borrower_email, u.name as borrower_name,
+             b.title as book_title, b.author as book_author
+      FROM borrow_requests br
+      JOIN users u ON br.from_user_id = u.id
+      JOIN books b ON br.book_id = b.id
+      WHERE br.to_user_id = ? AND br.status = 'borrower_returning'
+      ORDER BY br.updated_at DESC
+    `).all(userId);
+
+    res.json(requests);
+  } catch (error) {
+    handleError(res, error, 'Failed to fetch incoming returns');
+  }
+});
+
+// GET /api/borrow/incoming-returns/count - Get incoming return count for lender notifications
+router.get('/incoming-returns/count', (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = db.prepare(
+      `SELECT COUNT(*) as count FROM borrow_requests WHERE to_user_id = ? AND status = 'borrower_returning'`
+    ).get(userId);
+    res.json({ count: result.count });
+  } catch (error) {
+    handleError(res, error, 'Failed to fetch incoming return count');
+  }
+});
+
 // GET /api/borrow/return-requests - Get return request notifications for borrower
 router.get('/return-requests', (req, res) => {
   try {

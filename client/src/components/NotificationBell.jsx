@@ -2,22 +2,25 @@ import { useState, useEffect, useRef } from 'react';
 import {
   getFriendRequestCount, getFriendRequests, acceptFriendRequest, declineFriendRequest,
   getBorrowRequestCount, getBorrowRequests, acceptBorrowRequest, declineBorrowRequest,
-  getReturnRequestCount, getReturnRequests, acknowledgeReturn
+  getReturnRequestCount, getReturnRequests, acknowledgeReturn,
+  getIncomingReturnCount, getIncomingReturns, confirmReturn
 } from '../services/api';
 
 export default function NotificationBell() {
   const [friendCount, setFriendCount] = useState(0);
   const [borrowCount, setBorrowCount] = useState(0);
   const [returnCount, setReturnCount] = useState(0);
+  const [incomingReturnCount, setIncomingReturnCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [friendRequests, setFriendRequests] = useState([]);
   const [borrowRequests, setBorrowRequests] = useState([]);
   const [returnRequests, setReturnRequests] = useState([]);
+  const [incomingReturns, setIncomingReturns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const dropdownRef = useRef(null);
 
-  const totalCount = friendCount + borrowCount + returnCount;
+  const totalCount = friendCount + borrowCount + returnCount + incomingReturnCount;
 
   // Fetch counts on mount and every 30 seconds
   useEffect(() => {
@@ -39,14 +42,16 @@ export default function NotificationBell() {
 
   async function fetchCounts() {
     try {
-      const [friendData, borrowData, returnData] = await Promise.all([
+      const [friendData, borrowData, returnData, incomingReturnData] = await Promise.all([
         getFriendRequestCount(),
         getBorrowRequestCount(),
-        getReturnRequestCount()
+        getReturnRequestCount(),
+        getIncomingReturnCount()
       ]);
       setFriendCount(friendData.count);
       setBorrowCount(borrowData.count);
       setReturnCount(returnData.count);
+      setIncomingReturnCount(incomingReturnData.count);
     } catch (err) {
       console.error('Failed to fetch notification counts:', err);
     }
@@ -56,14 +61,16 @@ export default function NotificationBell() {
     if (!isOpen) {
       setLoading(true);
       try {
-        const [friendData, borrowData, returnData] = await Promise.all([
+        const [friendData, borrowData, returnData, incomingReturnData] = await Promise.all([
           getFriendRequests(),
           getBorrowRequests(),
-          getReturnRequests()
+          getReturnRequests(),
+          getIncomingReturns()
         ]);
         setFriendRequests(friendData);
         setBorrowRequests(borrowData);
         setReturnRequests(returnData);
+        setIncomingReturns(incomingReturnData);
       } catch (err) {
         console.error('Failed to fetch notifications:', err);
       }
@@ -128,6 +135,18 @@ export default function NotificationBell() {
       setReturnCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('Failed to acknowledge return:', err);
+    }
+    setActionLoading(null);
+  }
+
+  async function handleConfirmReturn(bookId, requestId) {
+    setActionLoading(`incoming-${requestId}`);
+    try {
+      await confirmReturn(bookId);
+      setIncomingReturns(prev => prev.filter(r => r.id !== requestId));
+      setIncomingReturnCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Failed to confirm return:', err);
     }
     setActionLoading(null);
   }
@@ -253,7 +272,7 @@ export default function NotificationBell() {
                   </>
                 )}
 
-                {/* Return Requests */}
+                {/* Return Requests (owner requested book back - borrower sees these) */}
                 {returnRequests.length > 0 && (
                   <>
                     <div className="p-3 border-b border-theme">
@@ -282,6 +301,44 @@ export default function NotificationBell() {
                                 className="px-3 py-1 text-xs font-medium bg-theme-accent text-theme-on-primary rounded-md hover:opacity-90 transition disabled:opacity-50"
                               >
                                 Acknowledge Return
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {/* Incoming Returns (borrower is returning book - lender sees these) */}
+                {incomingReturns.length > 0 && (
+                  <>
+                    <div className="p-3 border-b border-theme">
+                      <h3 className="font-semibold text-theme-primary text-sm">Incoming Returns</h3>
+                    </div>
+                    {incomingReturns.map(request => (
+                      <div key={`incoming-${request.id}`} className="p-3 border-b border-theme last:border-b-0">
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-theme-primary truncate">
+                              {request.borrower_name || request.borrower_email.split('@')[0]}
+                            </p>
+                            <p className="text-xs text-theme-muted mt-0.5">
+                              is returning <span className="font-medium text-theme-primary">{request.book_title}</span>
+                              {request.book_author && <span> by {request.book_author}</span>}
+                            </p>
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => handleConfirmReturn(request.book_id, request.id)}
+                                disabled={actionLoading === `incoming-${request.id}`}
+                                className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50"
+                              >
+                                Confirm Return
                               </button>
                             </div>
                           </div>

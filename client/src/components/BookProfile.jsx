@@ -491,9 +491,11 @@ export default function BookProfile() {
                   <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
                     book.borrow_status === 'borrowed'
                       ? 'bg-purple-100 text-purple-800'
+                      : book.borrow_status === 'borrower_returning'
+                      ? 'bg-green-100 text-green-800'
                       : 'bg-yellow-100 text-yellow-800'
                   }`}>
-                    {book.borrow_status === 'borrowed' ? 'Borrowed' : 'Return Requested'}
+                    {book.borrow_status === 'borrowed' ? 'Borrowed' : book.borrow_status === 'borrower_returning' ? 'Being Returned' : 'Return Requested'}
                   </span>
                   {book.borrower && (
                     <span className="text-sm text-theme-primary">
