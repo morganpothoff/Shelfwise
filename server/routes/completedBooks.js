@@ -18,8 +18,8 @@ function handleError(res, error, publicMessage) {
   res.status(500).json({ error: isProduction ? publicMessage : error.message });
 }
 
-// Helper to build a de-duplication key from a book
-function dedupeKey(book) {
+// Helper to build a de-duplication key from a book (exported for testing)
+export function dedupeKey(book) {
   const keys = [];
   if (book.isbn) {
     keys.push(`isbn:${book.isbn}`);
@@ -30,8 +30,8 @@ function dedupeKey(book) {
   return keys;
 }
 
-// Helper to format a library book as a unified completed book
-function formatLibraryBook(book) {
+// Helper to format a library book as a unified completed book (exported for testing)
+export function formatLibraryBook(book) {
   return {
     ...book,
     id: `library_${book.id}`,
@@ -41,8 +41,8 @@ function formatLibraryBook(book) {
   };
 }
 
-// Helper to format a completed book as a unified completed book
-function formatCompletedBook(book) {
+// Helper to format a completed book as a unified completed book (exported for testing)
+export function formatCompletedBook(book) {
   return {
     ...book,
     id: `completed_${book.id}`,
