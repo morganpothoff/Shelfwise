@@ -172,9 +172,36 @@ export function validateIdParam(req, res, next) {
   next();
 }
 
+// Middleware for validating unified ID parameter (library_N or completed_N)
+export function validateUnifiedIdParam(req, res, next) {
+  const raw = String(req.params.id);
+  let source, numericId;
+
+  if (raw.startsWith('library_')) {
+    source = 'library';
+    numericId = parseInt(raw.slice(8), 10);
+  } else if (raw.startsWith('completed_')) {
+    source = 'completed';
+    numericId = parseInt(raw.slice(10), 10);
+  } else {
+    // Legacy fallback: treat as completed
+    source = 'completed';
+    numericId = parseInt(raw, 10);
+  }
+
+  if (isNaN(numericId) || numericId < 1) {
+    return res.status(400).json({ error: 'Invalid book ID' });
+  }
+
+  req.params.source = source;
+  req.params.numericId = numericId;
+  next();
+}
+
 export default {
   validateBook,
   validateISBNScan,
   validateSearch,
-  validateIdParam
+  validateIdParam,
+  validateUnifiedIdParam
 };

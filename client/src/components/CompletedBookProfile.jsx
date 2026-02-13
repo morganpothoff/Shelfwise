@@ -150,8 +150,13 @@ export default function CompletedBookProfile() {
     }
   };
 
+  const isLibrary = book?.source === 'library';
+
   const handleDeleteBook = async () => {
-    if (!window.confirm(`Remove "${book.title}" from your completed books?`)) return;
+    const msg = isLibrary
+      ? `Mark "${book.title}" as unread? It will remain in your library.`
+      : `Remove "${book.title}" from your completed books?`;
+    if (!window.confirm(msg)) return;
 
     try {
       await deleteCompletedBook(id);
@@ -202,13 +207,13 @@ export default function CompletedBookProfile() {
     try {
       setAddingToLibrary(true);
       const result = await addCompletedBookToLibrary(id);
-      if (result.isExisting) {
-        setActionMessage({ type: 'success', text: `"${book.title}" is already in your library` });
-      } else {
-        setActionMessage({ type: 'success', text: `"${book.title}" added to your library!` });
-        setBook(prev => ({ ...prev, owned: 1 }));
-      }
-      setTimeout(() => setActionMessage(null), 3000);
+      // The completed book has been migrated to the library — navigate to the new URL
+      const newBookId = result.book.id;
+      setActionMessage({ type: 'success', text: `"${book.title}" added to your library!` });
+      // Navigate to the new library book profile
+      navigate(`/completed-book/${newBookId}`, { replace: true });
+      // Reload book data with the new ID
+      setBook(result.book);
     } catch (err) {
       setActionMessage({ type: 'error', text: err.message });
     } finally {
@@ -302,7 +307,7 @@ export default function CompletedBookProfile() {
 
               {/* Action buttons */}
               <div className="flex items-center gap-2 ml-4">
-                {!book.owned && (
+                {!isLibrary && !book.owned && (
                   <button
                     onClick={handleAddToLibrary}
                     disabled={addingToLibrary}
@@ -326,7 +331,7 @@ export default function CompletedBookProfile() {
                 <button
                   onClick={handleDeleteBook}
                   className="p-2 text-theme-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Remove from completed books"
+                  title={isLibrary ? "Mark as unread" : "Remove from completed books"}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -348,7 +353,12 @@ export default function CompletedBookProfile() {
 
             {/* Quick stats */}
             <div className="flex flex-wrap gap-4">
-              {book.owned ? (
+              {isLibrary ? (
+                <div className="bg-indigo-100 px-4 py-2 rounded-lg">
+                  <span className="text-sm text-indigo-600">Status</span>
+                  <p className="text-lg font-semibold text-indigo-800">In Library</p>
+                </div>
+              ) : book.owned ? (
                 <div className="bg-blue-100 px-4 py-2 rounded-lg">
                   <span className="text-sm text-blue-600">Status</span>
                   <p className="text-lg font-semibold text-blue-800">Owned</p>
@@ -379,8 +389,8 @@ export default function CompletedBookProfile() {
               )}
             </div>
 
-            {/* Add to Library button (prominent) */}
-            {!book.owned && (
+            {/* Add to Library button (prominent) — only for completed-source books not in library */}
+            {!isLibrary && !book.owned && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>

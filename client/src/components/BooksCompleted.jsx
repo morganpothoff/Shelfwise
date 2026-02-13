@@ -93,7 +93,8 @@ export default function BooksCompleted() {
     try {
       await deleteCompletedBook(bookId);
       setBooks(prev => prev.filter(book => book.id !== bookId));
-      setMessage('Book removed from completed books');
+      const isLibrary = typeof bookId === 'string' && bookId.startsWith('library_');
+      setMessage(isLibrary ? 'Book marked as unread' : 'Book removed from completed books');
     } catch (err) {
       setError(err.message);
     }
@@ -119,15 +120,12 @@ export default function BooksCompleted() {
   const handleAddToLibrary = async (bookId) => {
     try {
       const result = await addCompletedBookToLibrary(bookId);
-      if (result.isExisting) {
-        setMessage(`"${result.book.title}" is already in your library`);
-      } else {
-        setMessage(`"${result.book.title}" added to your library!`);
-        // Update the book in state to mark it as owned
-        setBooks(prev => prev.map(book =>
-          book.id === bookId ? { ...book, owned: 1 } : book
-        ));
-      }
+      // The completed book has been migrated to the library — replace in state with new library book
+      const newBook = result.book;
+      setBooks(prev => prev.map(book =>
+        book.id === bookId ? newBook : book
+      ));
+      setMessage(`"${newBook.title}" added to your library!`);
     } catch (err) {
       setError(err.message);
     }
@@ -150,14 +148,13 @@ export default function BooksCompleted() {
   };
 
   const handleImportComplete = (importedBooks, updatedLibraryBooks, newLibraryBooks) => {
-    if (importedBooks && importedBooks.length > 0) {
-      setBooks(prev => [...importedBooks, ...prev]);
-    }
-
     // Build success message
     const messages = [];
     if (importedBooks && importedBooks.length > 0) {
       messages.push(`${importedBooks.length} completed books imported`);
+    }
+    if (updatedLibraryBooks && updatedLibraryBooks.length > 0) {
+      messages.push(`${updatedLibraryBooks.length} library books marked as read`);
     }
     if (newLibraryBooks && newLibraryBooks.length > 0) {
       messages.push(`${newLibraryBooks.length} owned books added to library`);
@@ -166,6 +163,9 @@ export default function BooksCompleted() {
     if (messages.length > 0) {
       setMessage(`Success! ${messages.join(', ')}`);
     }
+
+    // Reload the unified list to include all sources
+    loadBooks();
   };
 
   const renderGridView = () => (
