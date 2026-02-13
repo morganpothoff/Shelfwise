@@ -1,11 +1,24 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Navbar from './Navbar';
+import ISBNScanner from './ISBNScanner';
+import ManualISBNEntry from './ManualISBNEntry';
+import ManualBookForm from './ManualBookForm';
+import AddCompletedBookConfirmModal from './AddCompletedBookConfirmModal';
 import CompletedBookCard from './CompletedBookCard';
 import CompletedBookListItem from './CompletedBookListItem';
 import EditSeriesModal from './EditSeriesModal';
 import ImportCompletedBooksModal from './ImportCompletedBooksModal';
-import { getCompletedBooks, deleteCompletedBook, updateCompletedBook, exportCompletedBooks, addCompletedBookToLibrary } from '../services/api';
+import {
+  getCompletedBooks,
+  deleteCompletedBook,
+  updateCompletedBook,
+  exportCompletedBooks,
+  addCompletedBookToLibrary,
+  lookupBookForCompletedByIsbn,
+  lookupBookForCompletedBySearch,
+  addCompletedBook,
+} from '../services/api';
 
 export default function BooksCompleted() {
   const { user, setViewMode: saveViewMode } = useAuth();
@@ -19,6 +32,13 @@ export default function BooksCompleted() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [showManualBookForm, setShowManualBookForm] = useState(false);
+  const [manualFormISBN, setManualFormISBN] = useState(null);
+  const [pendingBook, setPendingBook] = useState(null);
+  const [isbnNotFoundBook, setIsbnNotFoundBook] = useState(null);
+  const [addBookLoading, setAddBookLoading] = useState(false);
 
   useEffect(() => {
     loadBooks();
@@ -168,6 +188,90 @@ export default function BooksCompleted() {
     loadBooks();
   };
 
+  const handleISBNScanned = async (isbn) => {
+    setShowScanner(false);
+    setShowManualEntry(false);
+    setAddBookLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { book: bookData } = await lookupBookForCompletedByIsbn(isbn);
+      setPendingBook(bookData);
+    } catch (err) {
+      if (err.notFound) {
+        setManualFormISBN(err.isbn || isbn);
+        setShowManualBookForm(true);
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setAddBookLoading(false);
+    }
+  };
+
+  const handleManualBookSubmit = async ({ title, author, isbn }) => {
+    setShowManualBookForm(false);
+    setAddBookLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { book: bookData } = await lookupBookForCompletedBySearch(title, author, isbn || null);
+      setPendingBook(bookData);
+    } catch (err) {
+      if (err.isbnNotFound) {
+        setIsbnNotFoundBook({ title: err.title || title, author: err.author || author });
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setAddBookLoading(false);
+    }
+  };
+
+  const handleAddCompletedConfirm = async (dateFinished) => {
+    if (!pendingBook && !isbnNotFoundBook) return;
+    setError(null);
+    try {
+      if (isbnNotFoundBook) {
+        await addCompletedBook({
+          title: isbnNotFoundBook.title,
+          author: isbnNotFoundBook.author,
+          date_finished: dateFinished || null,
+        });
+        setIsbnNotFoundBook(null);
+        setMessage('Book added to Books Completed (without ISBN metadata)');
+      } else {
+        const tags = Array.isArray(pendingBook.tags) ? pendingBook.tags : [];
+        await addCompletedBook({
+          isbn: pendingBook.isbn || null,
+          title: pendingBook.title,
+          author: pendingBook.author || null,
+          page_count: pendingBook.page_count || null,
+          genre: pendingBook.genre || null,
+          synopsis: pendingBook.synopsis || null,
+          tags,
+          series_name: pendingBook.series_name || null,
+          series_position: pendingBook.series_position || null,
+          date_finished: dateFinished || null,
+          owned: false,
+        });
+        setPendingBook(null);
+        setMessage('Book added to Books Completed');
+      }
+      loadBooks();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const handleCloseConfirmModal = () => {
+    setPendingBook(null);
+    setIsbnNotFoundBook(null);
+  };
+
+  const confirmModalBook = pendingBook || (isbnNotFoundBook ? { title: isbnNotFoundBook.title, author: isbnNotFoundBook.author } : null);
+
   const renderGridView = () => (
     <div className="space-y-8">
       {groupedBooks.series.map(series => (
@@ -270,8 +374,39 @@ export default function BooksCompleted() {
         {/* Action buttons */}
         <div className="flex flex-wrap gap-4 mb-6">
           <button
+            onClick={() => setShowScanner(true)}
+            className="flex items-center gap-2 bg-theme-accent text-theme-on-primary px-4 py-2 rounded-md hover:opacity-90 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm3 5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm0 3a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clipRule="evenodd" />
+            </svg>
+            Scan ISBN
+          </button>
+          <button
+            onClick={() => setShowManualEntry(true)}
+            className="flex items-center gap-2 bg-theme-secondary text-theme-primary px-4 py-2 rounded-md hover:opacity-80 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+              <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
+            </svg>
+            Enter ISBN
+          </button>
+          <button
+            onClick={() => {
+              setManualFormISBN(null);
+              setShowManualBookForm(true);
+            }}
+            className="flex items-center gap-2 bg-theme-card text-theme-secondary border border-theme px-4 py-2 rounded-md hover:bg-theme-secondary transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            Add Manually
+          </button>
+          <button
             onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-2 bg-theme-accent bg-theme-accent-hover text-theme-on-primary px-4 py-2 rounded-md transition-colors"
+            className="flex items-center gap-2 bg-theme-card text-theme-secondary border border-theme px-4 py-2 rounded-md hover:bg-theme-secondary transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -316,9 +451,9 @@ export default function BooksCompleted() {
         )}
 
         {/* Status messages */}
-        {loading && (
+        {(loading || addBookLoading) && (
           <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-6">
-            Loading completed books...
+            {addBookLoading ? 'Looking up book information...' : 'Loading completed books...'}
           </div>
         )}
 
@@ -506,6 +641,39 @@ export default function BooksCompleted() {
         <ImportCompletedBooksModal
           onClose={() => setShowImportModal(false)}
           onImportComplete={handleImportComplete}
+        />
+      )}
+
+      {showScanner && (
+        <ISBNScanner
+          onScan={handleISBNScanned}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
+
+      {showManualEntry && (
+        <ManualISBNEntry
+          onSubmit={handleISBNScanned}
+          onClose={() => setShowManualEntry(false)}
+        />
+      )}
+
+      {showManualBookForm && (
+        <ManualBookForm
+          isbn={manualFormISBN}
+          onSubmit={handleManualBookSubmit}
+          onClose={() => {
+            setShowManualBookForm(false);
+            setManualFormISBN(null);
+          }}
+        />
+      )}
+
+      {confirmModalBook && (
+        <AddCompletedBookConfirmModal
+          book={confirmModalBook}
+          onConfirm={handleAddCompletedConfirm}
+          onClose={handleCloseConfirmModal}
         />
       )}
     </div>

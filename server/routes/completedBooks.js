@@ -3,7 +3,9 @@ import db from '../db/index.js';
 import { lookupISBN, searchByTitleAuthor } from '../services/isbnLookup.js';
 import {
   validateBook,
-  validateUnifiedIdParam
+  validateUnifiedIdParam,
+  validateISBNScan,
+  validateSearch
 } from '../middleware/validation.js';
 import * as XLSX from 'xlsx';
 
@@ -713,6 +715,46 @@ router.get('/series/list', (req, res) => {
     res.json(series.map(s => s.series_name));
   } catch (error) {
     handleError(res, error, 'Failed to fetch series');
+  }
+});
+
+// POST /api/completed-books/lookup/isbn - Look up book by ISBN (no insert, for add-to-completed flow)
+router.post('/lookup/isbn', validateISBNScan, async (req, res) => {
+  try {
+    const { isbn } = req.body;
+    const cleanIsbn = isbn.replace(/[-\s]/g, '');
+    const bookData = await lookupISBN(cleanIsbn);
+    if (!bookData) {
+      return res.status(404).json({
+        error: 'Book not found',
+        message: 'Could not find book information for this ISBN.',
+        isbn: cleanIsbn
+      });
+    }
+    res.json({ book: bookData });
+  } catch (error) {
+    handleError(res, error, 'Failed to lookup book');
+  }
+});
+
+// POST /api/completed-books/lookup/search - Look up book by title/author (no insert, for add-to-completed flow)
+router.post('/lookup/search', validateSearch, async (req, res) => {
+  try {
+    const { title, author, isbn } = req.body;
+    const searchData = await searchByTitleAuthor(title, author, isbn || null);
+    if (!searchData.isbn) {
+      return res.status(404).json({
+        error: 'ISBN not found',
+        message: 'Could not find an ISBN for this book.',
+        title,
+        author
+      });
+    }
+    const bookData = await lookupISBN(searchData.isbn);
+    const finalData = bookData || searchData;
+    res.json({ book: finalData });
+  } catch (error) {
+    handleError(res, error, 'Failed to lookup book');
   }
 });
 

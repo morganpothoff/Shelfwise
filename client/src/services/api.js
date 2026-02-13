@@ -570,6 +570,52 @@ export async function addCompletedBookToLibrary(id) {
   return response.json();
 }
 
+/** Look up book by ISBN for adding to Books Completed (no insert). */
+export async function lookupBookForCompletedByIsbn(isbn) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/lookup/isbn`, {
+    method: 'POST',
+    body: JSON.stringify({ isbn }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const err = new Error(data.error || 'Failed to lookup book');
+    err.notFound = response.status === 404;
+    err.isbn = data.isbn || isbn;
+    throw err;
+  }
+  return data;
+}
+
+/** Look up book by title/author for adding to Books Completed (no insert). */
+export async function lookupBookForCompletedBySearch(title, author, isbn = null) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books/lookup/search`, {
+    method: 'POST',
+    body: JSON.stringify({ title, author, isbn }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const err = new Error(data.error || 'Failed to lookup book');
+    err.isbnNotFound = response.status === 404;
+    err.title = data.title ?? title;
+    err.author = data.author ?? author;
+    throw err;
+  }
+  return data;
+}
+
+/** Add a single book to Books Completed (optional date_finished). */
+export async function addCompletedBook(bookData) {
+  const response = await fetchWithCredentials(`${API_BASE}/completed-books`, {
+    method: 'POST',
+    body: JSON.stringify(bookData),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to add completed book');
+  }
+  return response.json();
+}
+
 export async function getCompletedSeriesList() {
   const response = await fetchWithCredentials(`${API_BASE}/completed-books/series/list`);
 
