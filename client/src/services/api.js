@@ -698,6 +698,23 @@ export async function confirmCompletedBooksImport(booksToImport, libraryUpdates 
   return result;
 }
 
+// ============ PICK A NUMBER API ============
+
+export async function pickANumber(number, includeRead = false) {
+  const response = await fetchWithCredentials(`${API_BASE}/pick-a-number`, {
+    method: 'POST',
+    body: JSON.stringify({ number, includeRead }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to pick a book');
+  }
+
+  return data;
+}
+
 // ============ FRIENDS API ============
 
 export async function sendFriendRequest(email) {

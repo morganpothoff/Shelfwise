@@ -7,6 +7,7 @@ import booksRouter from './routes/books.js';
 import completedBooksRouter from './routes/completedBooks.js';
 import friendsRouter from './routes/friends.js';
 import borrowRouter from './routes/borrow.js';
+import pickANumberRouter from './routes/pickANumber.js';
 import authRouter from './routes/auth.js';
 import { requireAuth } from './middleware/auth.js';
 import { cleanExpiredSessions } from './services/auth.js';
@@ -89,6 +90,9 @@ app.use('/api/friends', requireAuth, friendsRouter);
 
 // Borrow routes require authentication
 app.use('/api/borrow', requireAuth, borrowRouter);
+
+// Pick a Number route requires authentication
+app.use('/api/pick-a-number', requireAuth, pickANumberRouter);
 
 // Health check (public)
 app.get('/api/health', (req, res) => {
