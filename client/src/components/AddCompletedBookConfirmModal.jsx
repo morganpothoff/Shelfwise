@@ -9,6 +9,8 @@ export default function AddCompletedBookConfirmModal({ book, onConfirm, onClose 
     try {
       await onConfirm(dateFinished.trim() || null);
       onClose();
+    } catch {
+      // Leave modal open so user can retry or cancel
     } finally {
       setSubmitting(false);
     }
