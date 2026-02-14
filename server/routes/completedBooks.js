@@ -3,7 +3,9 @@ import db from '../db/index.js';
 import { lookupISBN, searchByTitleAuthor } from '../services/isbnLookup.js';
 import {
   validateBook,
-  validateIdParam
+  validateUnifiedIdParam,
+  validateISBNScan,
+  validateSearch
 } from '../middleware/validation.js';
 import * as XLSX from 'xlsx';
 
@@ -18,34 +20,129 @@ function handleError(res, error, publicMessage) {
   res.status(500).json({ error: isProduction ? publicMessage : error.message });
 }
 
-// GET /api/completed-books - List all completed books for the authenticated user
+// Helper to build a de-duplication key from a book (exported for testing)
+export function dedupeKey(book) {
+  const keys = [];
+  if (book.isbn) {
+    keys.push(`isbn:${book.isbn}`);
+  }
+  if (book.title && book.author) {
+    keys.push(`ta:${book.title.toLowerCase()}|${book.author.toLowerCase()}`);
+  }
+  return keys;
+}
+
+// Helper to format a library book as a unified completed book (exported for testing)
+export function formatLibraryBook(book) {
+  return {
+    ...book,
+    id: `library_${book.id}`,
+    source: 'library',
+    owned: 1,
+    tags: book.tags ? JSON.parse(book.tags) : []
+  };
+}
+
+// Helper to format a completed book as a unified completed book (exported for testing)
+export function formatCompletedBook(book) {
+  return {
+    ...book,
+    id: `completed_${book.id}`,
+    source: 'completed',
+    tags: book.tags ? JSON.parse(book.tags) : []
+  };
+}
+
+// GET /api/completed-books - Unified list of all read books for the authenticated user
 router.get('/', (req, res) => {
   try {
     const userId = req.user.id;
-    const books = db.prepare('SELECT * FROM books_completed WHERE user_id = ? ORDER BY date_finished DESC, created_at DESC').all(userId);
-    // Parse tags JSON for each book
-    const parsedBooks = books.map(book => ({
-      ...book,
-      tags: book.tags ? JSON.parse(book.tags) : []
-    }));
-    res.json(parsedBooks);
+
+    // Get library books marked as read
+    const libraryBooks = db.prepare(
+      "SELECT * FROM books WHERE reading_status = 'read' AND user_id = ?"
+    ).all(userId);
+
+    // Get completed books
+    const completedBooks = db.prepare(
+      'SELECT * FROM books_completed WHERE user_id = ?'
+    ).all(userId);
+
+    // Build de-duplication set from library books (library wins)
+    const libraryKeys = new Set();
+    for (const book of libraryBooks) {
+      for (const key of dedupeKey(book)) {
+        libraryKeys.add(key);
+      }
+    }
+
+    // Format library books
+    const unified = libraryBooks.map(formatLibraryBook);
+
+    // Add completed books that don't duplicate library books
+    for (const book of completedBooks) {
+      const keys = dedupeKey(book);
+      const isDuplicate = keys.some(key => libraryKeys.has(key));
+      if (!isDuplicate) {
+        unified.push(formatCompletedBook(book));
+      }
+    }
+
+    // Sort by date_finished DESC, then created_at DESC
+    unified.sort((a, b) => {
+      const dateA = a.date_finished || '';
+      const dateB = b.date_finished || '';
+      if (dateB !== dateA) return dateB.localeCompare(dateA);
+      const createdA = a.created_at || '';
+      const createdB = b.created_at || '';
+      return createdB.localeCompare(createdA);
+    });
+
+    res.json(unified);
   } catch (error) {
     handleError(res, error, 'Failed to fetch completed books');
   }
 });
 
-// GET /api/completed-books/export - Export completed books for the authenticated user
+// GET /api/completed-books/export - Export unified completed books
 router.get('/export', (req, res) => {
   try {
     const userId = req.user.id;
     const { type = 'comprehensive', format = 'json' } = req.query;
 
-    const books = db.prepare('SELECT * FROM books_completed WHERE user_id = ? ORDER BY date_finished DESC, title').all(userId);
+    // Get unified list (same logic as GET /)
+    const libraryBooks = db.prepare(
+      "SELECT * FROM books WHERE reading_status = 'read' AND user_id = ?"
+    ).all(userId);
+    const completedBooks = db.prepare(
+      'SELECT * FROM books_completed WHERE user_id = ?'
+    ).all(userId);
+
+    const libraryKeys = new Set();
+    for (const book of libraryBooks) {
+      for (const key of dedupeKey(book)) {
+        libraryKeys.add(key);
+      }
+    }
+
+    const allBooks = [
+      ...libraryBooks.map(b => ({ ...b, owned: 1, tags: b.tags ? JSON.parse(b.tags) : [] })),
+      ...completedBooks
+        .filter(b => !dedupeKey(b).some(k => libraryKeys.has(k)))
+        .map(b => ({ ...b, tags: b.tags ? JSON.parse(b.tags) : [] }))
+    ];
+
+    allBooks.sort((a, b) => {
+      const dateA = a.date_finished || '';
+      const dateB = b.date_finished || '';
+      if (dateB !== dateA) return dateB.localeCompare(dateA);
+      return (a.title || '').localeCompare(b.title || '');
+    });
 
     let exportData;
 
     if (type === 'minimal') {
-      exportData = books.map(book => ({
+      exportData = allBooks.map(book => ({
         isbn: book.isbn || '',
         title: book.title,
         author: book.author || '',
@@ -55,14 +152,14 @@ router.get('/export', (req, res) => {
         owned: book.owned ? 'yes' : 'no'
       }));
     } else {
-      exportData = books.map(book => ({
+      exportData = allBooks.map(book => ({
         isbn: book.isbn || '',
         title: book.title,
         author: book.author || '',
         page_count: book.page_count || null,
         genre: book.genre || '',
         synopsis: book.synopsis || '',
-        tags: book.tags ? JSON.parse(book.tags) : [],
+        tags: book.tags || [],
         series_name: book.series_name || '',
         series_position: book.series_position || null,
         date_finished: book.date_finished || '',
@@ -265,17 +362,6 @@ function normalizeBookFields(book) {
 }
 
 // POST /api/completed-books/import/parse - Parse file and lookup ISBNs, return results for user review
-// Flow for importing read books:
-// 1. Is ISBN provided?
-//    a. Yes - is it in user's library (books table)?
-//       i. Yes - update the book to be listed as read, update date if provided (handled separately)
-//       ii. No - go to step 2
-//    b. No - go to step 2
-// 2. Is title present with author?
-//    a. Yes - look up ENGLISH version ISBN
-//       i. ISBN found - import book by ISBN as is done with scanning feature
-//       ii. No - add to list of books to manually review
-//    b. No - add to list of books to manually review
 router.post('/import/parse', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -556,16 +642,11 @@ router.post('/import/confirm', async (req, res) => {
           results.imported++;
 
           // If book is owned, also add to library (if not already there)
-          // Books with ISBN get added with full metadata
-          // Books without ISBN (notFound list) still get added with basic info since user marked them as owned
           if (book.owned) {
-            // Check if already in library by ISBN (if we have one)
             let existingLibrary = null;
             if (book.isbn) {
               existingLibrary = db.prepare('SELECT id FROM books WHERE isbn = ? AND user_id = ?').get(book.isbn, userId);
             }
-
-            // Also check by title+author
             if (!existingLibrary && book.title && book.author) {
               existingLibrary = db.prepare('SELECT id FROM books WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?) AND user_id = ?').get(book.title, book.author, userId);
             }
@@ -574,7 +655,7 @@ router.post('/import/confirm', async (req, res) => {
               try {
                 const libraryResult = insertLibraryStmt.run(
                   userId,
-                  book.isbn || null, // May be null for notFound books
+                  book.isbn || null,
                   book.title,
                   book.author || null,
                   book.page_count || null,
@@ -591,7 +672,6 @@ router.post('/import/confirm', async (req, res) => {
                 results.newLibraryBooks.push(newLibraryBook);
                 results.addedToLibrary++;
               } catch (libraryErr) {
-                // Don't fail the whole import if library insert fails, just log it
                 console.error(`Failed to add "${book.title}" to library:`, libraryErr.message);
               }
             }
@@ -620,38 +700,89 @@ router.post('/import/confirm', async (req, res) => {
   }
 });
 
-// GET /api/completed-books/series/list - Get all unique series names for completed books
+// GET /api/completed-books/series/list - Get all unique series names from both tables
 router.get('/series/list', (req, res) => {
   try {
     const userId = req.user.id;
     const series = db.prepare(`
-      SELECT DISTINCT series_name
-      FROM books_completed
-      WHERE user_id = ? AND series_name IS NOT NULL AND series_name != ''
+      SELECT DISTINCT series_name FROM (
+        SELECT series_name FROM books WHERE reading_status = 'read' AND user_id = ? AND series_name IS NOT NULL AND series_name != ''
+        UNION
+        SELECT series_name FROM books_completed WHERE user_id = ? AND series_name IS NOT NULL AND series_name != ''
+      )
       ORDER BY series_name
-    `).all(userId);
+    `).all(userId, userId);
     res.json(series.map(s => s.series_name));
   } catch (error) {
     handleError(res, error, 'Failed to fetch series');
   }
 });
 
-// GET /api/completed-books/:id - Get single completed book
-router.get('/:id', validateIdParam, (req, res) => {
+// POST /api/completed-books/lookup/isbn - Look up book by ISBN (no insert, for add-to-completed flow)
+router.post('/lookup/isbn', validateISBNScan, async (req, res) => {
+  try {
+    const { isbn } = req.body;
+    const cleanIsbn = isbn.replace(/[-\s]/g, '');
+    const bookData = await lookupISBN(cleanIsbn);
+    if (!bookData) {
+      return res.status(404).json({
+        error: 'Book not found',
+        message: 'Could not find book information for this ISBN.',
+        isbn: cleanIsbn
+      });
+    }
+    res.json({ book: bookData });
+  } catch (error) {
+    handleError(res, error, 'Failed to lookup book');
+  }
+});
+
+// POST /api/completed-books/lookup/search - Look up book by title/author (no insert, for add-to-completed flow)
+router.post('/lookup/search', validateSearch, async (req, res) => {
+  try {
+    const { title, author, isbn } = req.body;
+    const searchData = await searchByTitleAuthor(title, author, isbn || null);
+    if (!searchData.isbn) {
+      return res.status(404).json({
+        error: 'ISBN not found',
+        message: 'Could not find an ISBN for this book.',
+        title,
+        author
+      });
+    }
+    const bookData = await lookupISBN(searchData.isbn);
+    const finalData = bookData || searchData;
+    res.json({ book: finalData });
+  } catch (error) {
+    handleError(res, error, 'Failed to lookup book');
+  }
+});
+
+// GET /api/completed-books/:id - Get single book from unified view
+router.get('/:id', validateUnifiedIdParam, (req, res) => {
   try {
     const userId = req.user.id;
-    const book = db.prepare('SELECT * FROM books_completed WHERE id = ? AND user_id = ?').get(req.params.id, userId);
-    if (!book) {
-      return res.status(404).json({ error: 'Book not found' });
+    const { source, numericId } = req.params;
+
+    if (source === 'library') {
+      const book = db.prepare("SELECT * FROM books WHERE id = ? AND user_id = ? AND reading_status = 'read'").get(numericId, userId);
+      if (!book) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+      res.json(formatLibraryBook(book));
+    } else {
+      const book = db.prepare('SELECT * FROM books_completed WHERE id = ? AND user_id = ?').get(numericId, userId);
+      if (!book) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+      res.json(formatCompletedBook(book));
     }
-    book.tags = book.tags ? JSON.parse(book.tags) : [];
-    res.json(book);
   } catch (error) {
     handleError(res, error, 'Failed to fetch completed book');
   }
 });
 
-// POST /api/completed-books - Add completed book manually
+// POST /api/completed-books - Add completed book manually (always goes to books_completed)
 router.post('/', validateBook, (req, res) => {
   try {
     const userId = req.user.id;
@@ -682,22 +813,24 @@ router.post('/', validateBook, (req, res) => {
     );
 
     const newBook = db.prepare('SELECT * FROM books_completed WHERE id = ?').get(result.lastInsertRowid);
-    newBook.tags = newBook.tags ? JSON.parse(newBook.tags) : [];
-
-    res.status(201).json(newBook);
+    res.status(201).json(formatCompletedBook(newBook));
   } catch (error) {
     handleError(res, error, 'Failed to add completed book');
   }
 });
 
-// POST /api/completed-books/:id/add-to-library - Add a completed book to the user's library
-router.post('/:id/add-to-library', validateIdParam, async (req, res) => {
+// POST /api/completed-books/:id/add-to-library - Migrate a completed book to the library
+router.post('/:id/add-to-library', validateUnifiedIdParam, async (req, res) => {
   try {
     const userId = req.user.id;
-    const bookId = req.params.id;
+    const { source, numericId } = req.params;
+
+    if (source === 'library') {
+      return res.status(400).json({ error: 'Book is already in your library' });
+    }
 
     // Get the completed book
-    const completedBook = db.prepare('SELECT * FROM books_completed WHERE id = ? AND user_id = ?').get(bookId, userId);
+    const completedBook = db.prepare('SELECT * FROM books_completed WHERE id = ? AND user_id = ?').get(numericId, userId);
     if (!completedBook) {
       return res.status(404).json({ error: 'Completed book not found' });
     }
@@ -712,15 +845,34 @@ router.post('/:id/add-to-library', validateIdParam, async (req, res) => {
     }
 
     if (existingLibraryBook) {
-      existingLibraryBook.tags = existingLibraryBook.tags ? JSON.parse(existingLibraryBook.tags) : [];
+      // Book already in library — update it to read status, migrate rating, delete completed entry
+      db.prepare("UPDATE books SET reading_status = 'read', date_finished = COALESCE(?, date_finished), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .run(completedBook.date_finished, existingLibraryBook.id);
+
+      // Migrate rating if exists
+      const completedRating = db.prepare('SELECT * FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').get(numericId, userId);
+      if (completedRating) {
+        const existingLibraryRating = db.prepare('SELECT id FROM book_ratings WHERE book_id = ? AND user_id = ?').get(existingLibraryBook.id, userId);
+        if (!existingLibraryRating) {
+          db.prepare('INSERT INTO book_ratings (book_id, user_id, rating, comment) VALUES (?, ?, ?, ?)').run(existingLibraryBook.id, userId, completedRating.rating, completedRating.comment);
+        }
+        db.prepare('DELETE FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').run(numericId, userId);
+      }
+
+      // Delete the completed book entry
+      db.prepare('DELETE FROM books_completed WHERE id = ? AND user_id = ?').run(numericId, userId);
+
+      const updatedBook = db.prepare('SELECT * FROM books WHERE id = ?').get(existingLibraryBook.id);
+      updatedBook.tags = updatedBook.tags ? JSON.parse(updatedBook.tags) : [];
+
       return res.status(200).json({
-        book: existingLibraryBook,
-        message: 'Book already exists in library',
+        book: { ...updatedBook, id: `library_${updatedBook.id}`, source: 'library', owned: 1 },
+        message: 'Book already exists in library — merged and updated',
         isExisting: true
       });
     }
 
-    // Add to library
+    // Add to library as a new book
     const insertStmt = db.prepare(`
       INSERT INTO books (user_id, isbn, title, author, page_count, genre, synopsis, tags, series_name, series_position, reading_status, date_finished)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'read', ?)
@@ -740,14 +892,23 @@ router.post('/:id/add-to-library', validateIdParam, async (req, res) => {
       completedBook.date_finished
     );
 
-    const newBook = db.prepare('SELECT * FROM books WHERE id = ?').get(result.lastInsertRowid);
+    const newLibraryBookId = result.lastInsertRowid;
+
+    // Migrate rating if exists
+    const completedRating = db.prepare('SELECT * FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').get(numericId, userId);
+    if (completedRating) {
+      db.prepare('INSERT INTO book_ratings (book_id, user_id, rating, comment) VALUES (?, ?, ?, ?)').run(newLibraryBookId, userId, completedRating.rating, completedRating.comment);
+      db.prepare('DELETE FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').run(numericId, userId);
+    }
+
+    // Delete the completed book entry
+    db.prepare('DELETE FROM books_completed WHERE id = ? AND user_id = ?').run(numericId, userId);
+
+    const newBook = db.prepare('SELECT * FROM books WHERE id = ?').get(newLibraryBookId);
     newBook.tags = newBook.tags ? JSON.parse(newBook.tags) : [];
 
-    // Update the completed book to mark as owned
-    db.prepare('UPDATE books_completed SET owned = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(bookId);
-
     res.status(201).json({
-      book: newBook,
+      book: { ...newBook, id: `library_${newBook.id}`, source: 'library', owned: 1 },
       message: 'Book added to library successfully',
       isExisting: false
     });
@@ -756,88 +917,135 @@ router.post('/:id/add-to-library', validateIdParam, async (req, res) => {
   }
 });
 
-// PUT /api/completed-books/:id - Update completed book
-router.put('/:id', validateIdParam, validateBook, (req, res) => {
+// PUT /api/completed-books/:id - Update book in unified view
+router.put('/:id', validateUnifiedIdParam, validateBook, (req, res) => {
   try {
     const userId = req.user.id;
+    const { source, numericId } = req.params;
     const { title, author, page_count, genre, synopsis, tags, series_name, series_position, date_finished, owned } = req.body;
-    const bookId = req.params.id;
 
-    const existing = db.prepare('SELECT * FROM books_completed WHERE id = ? AND user_id = ?').get(bookId, userId);
-    if (!existing) {
-      return res.status(404).json({ error: 'Book not found' });
+    if (source === 'library') {
+      const existing = db.prepare("SELECT * FROM books WHERE id = ? AND user_id = ? AND reading_status = 'read'").get(numericId, userId);
+      if (!existing) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+
+      db.prepare(`
+        UPDATE books
+        SET title = ?, author = ?, page_count = ?, genre = ?, synopsis = ?, tags = ?,
+            series_name = ?, series_position = ?, date_finished = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+      `).run(
+        title ?? existing.title,
+        author ?? existing.author,
+        page_count ?? existing.page_count,
+        genre ?? existing.genre,
+        synopsis ?? existing.synopsis,
+        Array.isArray(tags) ? JSON.stringify(tags) : tags ?? existing.tags,
+        series_name !== undefined ? series_name : existing.series_name,
+        series_position !== undefined ? series_position : existing.series_position,
+        date_finished !== undefined ? date_finished : existing.date_finished,
+        numericId,
+        userId
+      );
+
+      const updatedBook = db.prepare('SELECT * FROM books WHERE id = ?').get(numericId);
+      res.json(formatLibraryBook(updatedBook));
+    } else {
+      const existing = db.prepare('SELECT * FROM books_completed WHERE id = ? AND user_id = ?').get(numericId, userId);
+      if (!existing) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+
+      db.prepare(`
+        UPDATE books_completed
+        SET title = ?, author = ?, page_count = ?, genre = ?, synopsis = ?, tags = ?,
+            series_name = ?, series_position = ?, date_finished = ?, owned = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+      `).run(
+        title ?? existing.title,
+        author ?? existing.author,
+        page_count ?? existing.page_count,
+        genre ?? existing.genre,
+        synopsis ?? existing.synopsis,
+        Array.isArray(tags) ? JSON.stringify(tags) : tags ?? existing.tags,
+        series_name !== undefined ? series_name : existing.series_name,
+        series_position !== undefined ? series_position : existing.series_position,
+        date_finished !== undefined ? date_finished : existing.date_finished,
+        owned !== undefined ? (owned ? 1 : 0) : existing.owned,
+        numericId,
+        userId
+      );
+
+      const updatedBook = db.prepare('SELECT * FROM books_completed WHERE id = ?').get(numericId);
+      res.json(formatCompletedBook(updatedBook));
     }
-
-    const stmt = db.prepare(`
-      UPDATE books_completed
-      SET title = ?, author = ?, page_count = ?, genre = ?, synopsis = ?, tags = ?,
-          series_name = ?, series_position = ?, date_finished = ?, owned = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND user_id = ?
-    `);
-
-    stmt.run(
-      title ?? existing.title,
-      author ?? existing.author,
-      page_count ?? existing.page_count,
-      genre ?? existing.genre,
-      synopsis ?? existing.synopsis,
-      Array.isArray(tags) ? JSON.stringify(tags) : tags ?? existing.tags,
-      series_name !== undefined ? series_name : existing.series_name,
-      series_position !== undefined ? series_position : existing.series_position,
-      date_finished !== undefined ? date_finished : existing.date_finished,
-      owned !== undefined ? (owned ? 1 : 0) : existing.owned,
-      bookId,
-      userId
-    );
-
-    const updatedBook = db.prepare('SELECT * FROM books_completed WHERE id = ?').get(bookId);
-    updatedBook.tags = updatedBook.tags ? JSON.parse(updatedBook.tags) : [];
-
-    res.json(updatedBook);
   } catch (error) {
     handleError(res, error, 'Failed to update completed book');
   }
 });
 
-// DELETE /api/completed-books/:id - Delete completed book
-router.delete('/:id', validateIdParam, (req, res) => {
+// DELETE /api/completed-books/:id - Remove from unified view
+router.delete('/:id', validateUnifiedIdParam, (req, res) => {
   try {
     const userId = req.user.id;
-    const result = db.prepare('DELETE FROM books_completed WHERE id = ? AND user_id = ?').run(req.params.id, userId);
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Book not found' });
+    const { source, numericId } = req.params;
+
+    if (source === 'library') {
+      // Don't delete the book — just mark as unread and clear date_finished
+      const result = db.prepare(`
+        UPDATE books SET reading_status = 'unread', date_finished = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ? AND reading_status = 'read'
+      `).run(numericId, userId);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+      res.json({ message: 'Book marked as unread' });
+    } else {
+      const result = db.prepare('DELETE FROM books_completed WHERE id = ? AND user_id = ?').run(numericId, userId);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+      res.json({ message: 'Completed book deleted successfully' });
     }
-    res.json({ message: 'Completed book deleted successfully' });
   } catch (error) {
     handleError(res, error, 'Failed to delete completed book');
   }
 });
 
-// ============ COMPLETED BOOK RATINGS ============
+// ============ COMPLETED BOOK RATINGS (unified) ============
 
-// GET /api/completed-books/:id/rating - Get rating for a completed book
-router.get('/:id/rating', validateIdParam, (req, res) => {
+// GET /api/completed-books/:id/rating - Get rating for a book in the unified view
+router.get('/:id/rating', validateUnifiedIdParam, (req, res) => {
   try {
     const userId = req.user.id;
-    const bookId = req.params.id;
+    const { source, numericId } = req.params;
 
-    const book = db.prepare('SELECT id FROM books_completed WHERE id = ? AND user_id = ?').get(bookId, userId);
-    if (!book) {
-      return res.status(404).json({ error: 'Book not found' });
+    if (source === 'library') {
+      const book = db.prepare("SELECT id FROM books WHERE id = ? AND user_id = ? AND reading_status = 'read'").get(numericId, userId);
+      if (!book) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+      const rating = db.prepare('SELECT * FROM book_ratings WHERE book_id = ? AND user_id = ?').get(numericId, userId);
+      res.json(rating || null);
+    } else {
+      const book = db.prepare('SELECT id FROM books_completed WHERE id = ? AND user_id = ?').get(numericId, userId);
+      if (!book) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+      const rating = db.prepare('SELECT * FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').get(numericId, userId);
+      res.json(rating || null);
     }
-
-    const rating = db.prepare('SELECT * FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').get(bookId, userId);
-    res.json(rating || null);
   } catch (error) {
     handleError(res, error, 'Failed to fetch rating');
   }
 });
 
-// POST /api/completed-books/:id/rating - Create or update rating for a completed book
-router.post('/:id/rating', validateIdParam, (req, res) => {
+// POST /api/completed-books/:id/rating - Create or update rating
+router.post('/:id/rating', validateUnifiedIdParam, (req, res) => {
   try {
     const userId = req.user.id;
-    const bookId = req.params.id;
+    const { source, numericId } = req.params;
     const { rating, comment } = req.body;
 
     if (!rating || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
@@ -848,45 +1056,57 @@ router.post('/:id/rating', validateIdParam, (req, res) => {
       return res.status(400).json({ error: 'Comment must be less than 5000 characters' });
     }
 
-    const book = db.prepare('SELECT id FROM books_completed WHERE id = ? AND user_id = ?').get(bookId, userId);
+    const ratingsTable = source === 'library' ? 'book_ratings' : 'completed_book_ratings';
+    const booksTable = source === 'library' ? 'books' : 'books_completed';
+    const bookCondition = source === 'library'
+      ? "id = ? AND user_id = ? AND reading_status = 'read'"
+      : 'id = ? AND user_id = ?';
+
+    const book = db.prepare(`SELECT id FROM ${booksTable} WHERE ${bookCondition}`).get(numericId, userId);
     if (!book) {
       return res.status(404).json({ error: 'Book not found' });
     }
 
-    const existingRating = db.prepare('SELECT id FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').get(bookId, userId);
+    const existingRating = db.prepare(`SELECT id FROM ${ratingsTable} WHERE book_id = ? AND user_id = ?`).get(numericId, userId);
 
     if (existingRating) {
       db.prepare(`
-        UPDATE completed_book_ratings
+        UPDATE ${ratingsTable}
         SET rating = ?, comment = ?, updated_at = CURRENT_TIMESTAMP
         WHERE book_id = ? AND user_id = ?
-      `).run(rating, comment || null, bookId, userId);
+      `).run(rating, comment || null, numericId, userId);
     } else {
       db.prepare(`
-        INSERT INTO completed_book_ratings (book_id, user_id, rating, comment)
+        INSERT INTO ${ratingsTable} (book_id, user_id, rating, comment)
         VALUES (?, ?, ?, ?)
-      `).run(bookId, userId, rating, comment || null);
+      `).run(numericId, userId, rating, comment || null);
     }
 
-    const savedRating = db.prepare('SELECT * FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').get(bookId, userId);
+    const savedRating = db.prepare(`SELECT * FROM ${ratingsTable} WHERE book_id = ? AND user_id = ?`).get(numericId, userId);
     res.status(existingRating ? 200 : 201).json(savedRating);
   } catch (error) {
     handleError(res, error, 'Failed to save rating');
   }
 });
 
-// DELETE /api/completed-books/:id/rating - Delete rating for a completed book
-router.delete('/:id/rating', validateIdParam, (req, res) => {
+// DELETE /api/completed-books/:id/rating - Delete rating
+router.delete('/:id/rating', validateUnifiedIdParam, (req, res) => {
   try {
     const userId = req.user.id;
-    const bookId = req.params.id;
+    const { source, numericId } = req.params;
 
-    const book = db.prepare('SELECT id FROM books_completed WHERE id = ? AND user_id = ?').get(bookId, userId);
+    const ratingsTable = source === 'library' ? 'book_ratings' : 'completed_book_ratings';
+    const booksTable = source === 'library' ? 'books' : 'books_completed';
+    const bookCondition = source === 'library'
+      ? "id = ? AND user_id = ? AND reading_status = 'read'"
+      : 'id = ? AND user_id = ?';
+
+    const book = db.prepare(`SELECT id FROM ${booksTable} WHERE ${bookCondition}`).get(numericId, userId);
     if (!book) {
       return res.status(404).json({ error: 'Book not found' });
     }
 
-    const result = db.prepare('DELETE FROM completed_book_ratings WHERE book_id = ? AND user_id = ?').run(bookId, userId);
+    const result = db.prepare(`DELETE FROM ${ratingsTable} WHERE book_id = ? AND user_id = ?`).run(numericId, userId);
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Rating not found' });
     }

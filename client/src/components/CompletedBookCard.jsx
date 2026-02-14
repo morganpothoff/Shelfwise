@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
 
 export default function CompletedBookCard({ book, onDelete, onEditSeries, onAddToLibrary, showSeriesPosition }) {
+  const isLibrary = book.source === 'library';
+
   const handleDelete = () => {
-    if (window.confirm(`Remove "${book.title}" from your completed books?`)) {
+    const msg = isLibrary
+      ? `Mark "${book.title}" as unread? It will remain in your library.`
+      : `Remove "${book.title}" from your completed books?`;
+    if (window.confirm(msg)) {
       onDelete(book.id);
     }
   };
@@ -22,7 +27,7 @@ export default function CompletedBookCard({ book, onDelete, onEditSeries, onAddT
   return (
     <div className="bg-theme-card rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow relative group">
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {!book.owned && (
+        {!isLibrary && !book.owned && (
           <button
             onClick={handleAddToLibrary}
             className="text-theme-muted hover:text-green-500"
@@ -45,7 +50,7 @@ export default function CompletedBookCard({ book, onDelete, onEditSeries, onAddT
         <button
           onClick={handleDelete}
           className="text-theme-muted hover:text-red-500"
-          title="Remove from completed books"
+          title={isLibrary ? "Mark as unread" : "Remove from completed books"}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -74,7 +79,11 @@ export default function CompletedBookCard({ book, onDelete, onEditSeries, onAddT
             Finished: {formatDate(book.date_finished)}
           </span>
         )}
-        {book.owned ? (
+        {isLibrary ? (
+          <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-medium">
+            In Library
+          </span>
+        ) : book.owned ? (
           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
             Owned
           </span>

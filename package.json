@@ -15,7 +15,9 @@
     "db:migrate-friends": "node server/db/migrate-friends.js",
     "db:migrate-borrow": "node server/db/migrate-borrow.js",
     "build": "cd client && npm run build",
-    "start": "NODE_ENV=production node server/index.js"
+    "start": "NODE_ENV=production node server/index.js",
+    "test": "node --test server/",
+    "test:client": "cd client && npm run test"
   },
   "keywords": [
     "books",
