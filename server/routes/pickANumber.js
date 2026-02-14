@@ -75,7 +75,7 @@ function transformUserNumber(userNumber) {
 //   - offset_basis = 2166136261 (FNV standard for 32-bit)
 //   - prime = 16777619 (FNV standard for 32-bit)
 // We hash: title, author, genre, isbn, page_count, series_name
-function fnv1aHash(str) {
+export function fnv1aHash(str) {
   let hash = 2166136261; // FNV offset basis (32-bit)
   for (let i = 0; i < str.length; i++) {
     hash ^= str.charCodeAt(i);
@@ -85,7 +85,7 @@ function fnv1aHash(str) {
   return hash >>> 0; // Force unsigned 32-bit
 }
 
-function hashBook(book) {
+export function hashBook(book) {
   // Concatenate metadata fields with delimiters to avoid collisions
   // e.g., title="AB" author="C" vs title="A" author="BC"
   const metadata = [
@@ -218,7 +218,7 @@ function spectralBalance(chaoticValue, bookIndex, totalBooks) {
 // --- FINAL SELECTION ---
 // Runs all 5 layers, scores each book, and returns the one with the
 // highest combined score. This is deterministic: same input = same result.
-function selectBook(userNumber, books) {
+export function selectBook(userNumber, books) {
   // Layer 1: Transform user input
   const transformed = transformUserNumber(userNumber);
 

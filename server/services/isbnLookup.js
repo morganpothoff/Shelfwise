@@ -12,7 +12,7 @@ const MAX_TAG_LENGTH = 25;
  * - Removes special characters (keeps only alphanumeric, spaces, and hyphens)
  * - Trims whitespace
  */
-function cleanTags(tags) {
+export function cleanTags(tags) {
   if (!Array.isArray(tags)) return [];
 
   const seen = new Set();
@@ -49,7 +49,7 @@ function cleanTags(tags) {
  * Some book APIs return bilingual descriptions (e.g. English + French).
  * This strips the non-English portion.
  */
-function cleanSynopsis(synopsis) {
+export function cleanSynopsis(synopsis) {
   if (!synopsis || typeof synopsis !== 'string') return '';
 
   let cleaned = synopsis;
@@ -153,7 +153,7 @@ export async function lookupISBN(isbn) {
  * Check if two author strings are similar enough to be considered a match.
  * Handles cases like "J.K. Rowling" vs "Rowling, J.K." or "Stephen King" vs "King, Stephen"
  */
-function authorsMatch(requestedAuthor, foundAuthor) {
+export function authorsMatch(requestedAuthor, foundAuthor) {
   if (!requestedAuthor || !foundAuthor) return false;
 
   // Normalize: lowercase, remove punctuation, normalize whitespace
