@@ -172,6 +172,25 @@ export function validateIdParam(req, res, next) {
   next();
 }
 
+/**
+ * Reusable middleware for validating a positive integer ID in req.params.
+ * @param {string} paramName - Name of the param (e.g. 'friendId', 'bookId')
+ * @param {string} [errorMessage] - Custom error message
+ */
+export function validatePositiveIdParam(paramName, errorMessage = 'Invalid ID') {
+  return (req, res, next) => {
+    const raw = req.params[paramName];
+    const id = parseInt(raw, 10);
+
+    if (raw === undefined || raw === null || isNaN(id) || id < 1) {
+      return res.status(400).json({ error: errorMessage });
+    }
+
+    req.params[paramName] = id;
+    next();
+  };
+}
+
 // Middleware for validating unified ID parameter (library_N or completed_N)
 export function validateUnifiedIdParam(req, res, next) {
   const raw = String(req.params.id);
@@ -203,5 +222,6 @@ export default {
   validateISBNScan,
   validateSearch,
   validateIdParam,
-  validateUnifiedIdParam
+  validateUnifiedIdParam,
+  validatePositiveIdParam
 };

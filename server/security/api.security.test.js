@@ -154,4 +154,47 @@ describe('API Security', () => {
       assert.ok(res.status >= 400 || res.body?.error);
     });
   });
+
+  describe('Friends routes - require auth', () => {
+    it('GET /api/friends returns 401 without session', async () => {
+      const res = await request(app).get('/api/friends').expect(401);
+      assert.ok(res.body.error);
+    });
+
+    it('POST /api/friends/request returns 401 without session', async () => {
+      const res = await request(app)
+        .post('/api/friends/request')
+        .send({ email: 'friend@example.com' })
+        .set('Content-Type', 'application/json')
+        .expect(401);
+      assert.ok(res.body.error);
+    });
+
+    it('GET /api/friends/requests returns 401 without session', async () => {
+      await request(app).get('/api/friends/requests').expect(401);
+    });
+
+    it('DELETE /api/friends/1 returns 401 without session', async () => {
+      await request(app).delete('/api/friends/1').expect(401);
+    });
+  });
+
+  describe('Borrow routes - require auth', () => {
+    it('POST /api/borrow/request returns 401 without session', async () => {
+      const res = await request(app)
+        .post('/api/borrow/request')
+        .send({ bookId: 1 })
+        .set('Content-Type', 'application/json')
+        .expect(401);
+      assert.ok(res.body.error);
+    });
+
+    it('GET /api/borrow/requests returns 401 without session', async () => {
+      await request(app).get('/api/borrow/requests').expect(401);
+    });
+
+    it('GET /api/borrow/lending returns 401 without session', async () => {
+      await request(app).get('/api/borrow/lending').expect(401);
+    });
+  });
 });

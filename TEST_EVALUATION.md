@@ -1,112 +1,92 @@
-# Shelfwise Test Evaluation & Security Verification
+# Shelfwise — Testing & Security Evaluation
 
 **Evaluation Date:** February 2025  
-**Test Framework:** Node.js built-in `node:test` (server), Vitest (client)
+**Test Frameworks:** Node.js `node:test` (server), Vitest (client), Supertest (API)
+
+For a quick overview, see [TEST_SUMMARY.md](./TEST_SUMMARY.md).
 
 ---
 
-## Test Coverage Summary
+## 1. Test Coverage Analysis
 
-### Server Tests (101 tests)
+### 1.1 Server — What's Tested
 
-| Category | Files | Tests | Coverage |
-|----------|-------|-------|----------|
-| Auth Middleware | `auth.test.js` | 6 | requireAuth, optionalAuth |
-| Validation | `validation.test.js` | 26 | validateBook, validateISBNScan, validateSearch, validateIdParam, validateUnifiedIdParam |
-| Completed Books | `completedBooks.test.js` | 10 | dedupeKey, formatLibraryBook, formatCompletedBook |
-| Pick a Number | `pickANumber.test.js` | 11 | fnv1aHash, hashBook, selectBook |
-| ISBN Lookup | `isbnLookup.test.js` | 16 | cleanTags, cleanSynopsis, authorsMatch |
-| **Validation Security** | `security/validation.security.test.js` | 20 | Max length, type safety, ID validation, ISBN enforcement |
-| **API Security** | `security/api.security.test.js` | 14 | Protected routes, auth validation, user enumeration prevention |
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| auth.test.js | 6 | requireAuth, optionalAuth |
+| validation.test.js | 26 | validateBook, validateISBNScan, validateSearch, validateIdParam, validateUnifiedIdParam |
+| completedBooks.test.js | 10 | dedupeKey, formatLibraryBook, formatCompletedBook |
+| pickANumber.test.js | 11 | fnv1aHash, hashBook, selectBook |
+| isbnLookup.test.js | 16 | cleanTags, cleanSynopsis, authorsMatch |
+| validation.security.test.js | 20 | Max length, type safety, ID validation, ISBN, numeric bounds |
+| api.security.test.js | 14 | Protected routes 401, auth validation, user enumeration |
 
-### Client Tests (88 tests)
+### 1.2 Server — Untested Areas
 
-| Category | Files | Tests |
-|----------|-------|-------|
-| Components | BookCard, BookListItem, CompletedBookCard, etc. | 62 |
-| API Service | api.test.js | 13 |
-| Auth/Pages | LoginPage, Navbar | 9 |
-| Books Completed | BooksCompleted, AddCompletedBookConfirmModal | 13 |
+| Route/Module | Risk | Notes |
+|--------------|------|-------|
+| auth.js | Medium | Route handlers; password/token logic |
+| friends.js | Medium | Param validation, friendship checks |
+| borrow.js | Medium | Param validation, ownership checks |
+| books.js | Low | Validation tested; routes use req.user.id |
+| completedBooks.js | Low | Helpers tested |
+| email.js | Low | External service |
 
----
+### 1.3 Client — What's Tested
 
-## Security Tests Added
+| Component | Tests |
+|-----------|-------|
+| BookCard, BookListItem | 20 |
+| CompletedBookCard, CompletedBookListItem | 16 |
+| BooksCompleted, AddCompletedBookConfirmModal | 22 |
+| CompletedBookProfile | 8 |
+| Navbar, LoginPage | 9 |
+| api.test.js | 13 |
 
-### 1. Validation Security (`server/security/validation.security.test.js`)
+### 1.4 Client — Untested Components
 
-**Max Length Enforcement (DoS Prevention)**
-- Truncates title to 500 chars, author to 300, synopsis to 10,000
-- Limits tags array to 50 elements, each tag to 100 chars
-
-**Type Safety**
-- Non-string title coerced to null
-- Non-numeric page_count rejected
-- Non-string elements filtered from tags array
-
-**ID Validation (Injection Prevention)**
-- Rejects fully non-numeric IDs (e.g. `; DROP TABLE books;--`)
-- Rejects path traversal attempts (`../../../etc/passwd`)
-- Rejects object/array as id param (type confusion)
-- Rejects `library_` / `completed_` with non-numeric suffix
-
-**ISBN Validation**
-- Rejects script-like content (`<script>alert(1)</script>`)
-- Rejects SQL fragments in ISBN
-- Rejects missing ISBN
-
-**Numeric Boundaries**
-- Rejects page_count > 99,999, negative, or zero
-
-### 2. API Security (`server/security/api.security.test.js`)
-
-**Authentication – Protected Routes**
-- `GET /api/books` returns 401 without session cookie
-- `GET /api/completed-books` returns 401
-- `POST /api/pick-a-number` returns 401
-- `DELETE /api/books/1` returns 401
-- Invalid/expired session cookie returns 401
-
-**Auth Input Validation**
-- Login rejects empty body, missing email, missing password
-- **User enumeration prevention:** Same "Invalid email or password" for non-existent user
-- Register rejects short password (< 8 chars)
-- Register rejects invalid email format
-- Register rejects empty password
-
-**Public Endpoints**
-- `GET /api/health` returns 200 without auth
+Library, RegisterPage, BookProfile, FriendsPage, BorrowPage, Import modals, AuthContext, ManualBookForm, UserProfile, etc.
 
 ---
 
-## Architecture Changes for Testing
+## 2. Security Posture Assessment
 
-1. **App extraction:** Express app moved to `server/app.js` so tests can import it without starting the server. `server/index.js` imports and starts the app.
+### 2.1 Implemented Controls ✅
 
-2. **Supertest dependency:** Added for API integration tests (`npm install --save-dev supertest`).
+Parameterized queries, input validation (max lengths, types), auth middleware, user enumeration prevention, password min 8 chars, secure cookies (httpOnly, secure, sameSite), rate limiting, Helmet, JSON body limit 100kb.
+
+### 2.2 Authorization (IDOR)
+
+Books, completed books, friend requests, borrow requests: all scope by user_id or verify friendship/ownership.
+
+### 2.3 Parameter Validation
+
+- Books: validateIdParam, validateUnifiedIdParam
+- Friends/Borrow: inline parseInt + NaN check (no shared middleware)
 
 ---
 
-## Running Tests
+## 3. Recommendations
+
+### High priority
+1. Library component tests
+2. RegisterPage tests
+
+### Medium priority
+3. Friends/Borrow route tests
+4. BookProfile tests
+5. AuthContext tests
+
+### Low priority
+6. Shared param validation middleware
+7. Import modal tests
+8. Password reset token tests
+
+---
+
+## 4. Running Tests
 
 ```bash
-# Server tests (including security)
-npm test
-
-# Client tests
-npm run test:client
+npm test              # Server (may need non-sandbox for API security tests)
+npm run test:client   # Client
 ```
-
----
-
-## Security Posture Verified
-
-| Control | Status |
-|---------|--------|
-| Parameterized SQL queries | ✅ (better-sqlite3 uses `?` placeholders) |
-| Input length limits | ✅ (validation truncates) |
-| Auth required on protected routes | ✅ (requireAuth middleware) |
-| User enumeration prevention | ✅ (generic login error) |
-| Password length validation | ✅ (min 8 chars) |
-| Rate limiting | ✅ (auth: 10/15min, scan: 10/min) |
-| Helmet security headers | ✅ |
-| JSON body size limit | ✅ (100kb) |

@@ -5,7 +5,8 @@ import {
   validateBook,
   validateISBNScan,
   validateSearch,
-  validateIdParam
+  validateIdParam,
+  validatePositiveIdParam
 } from './validation.js';
 
 function makeRes() {
@@ -206,6 +207,58 @@ describe('validateIdParam', () => {
     validateIdParam(reqNeg, resNeg, nextNeg);
     assert.strictEqual(nextNeg.called, false);
     assert.strictEqual(resNeg.statusCode, 400);
+  });
+});
+
+describe('validatePositiveIdParam', () => {
+  it('parses valid friendId and calls next', () => {
+    const middleware = validatePositiveIdParam('friendId', 'Invalid friend ID');
+    const req = { params: { friendId: '5' } };
+    const res = makeRes();
+    const next = makeNext();
+    middleware(req, res, next);
+    assert.strictEqual(next.called, true);
+    assert.strictEqual(req.params.friendId, 5);
+  });
+
+  it('parses valid bookId and calls next', () => {
+    const middleware = validatePositiveIdParam('bookId', 'Invalid book ID');
+    const req = { params: { bookId: '42' } };
+    const res = makeRes();
+    const next = makeNext();
+    middleware(req, res, next);
+    assert.strictEqual(next.called, true);
+    assert.strictEqual(req.params.bookId, 42);
+  });
+
+  it('returns 400 for non-numeric param', () => {
+    const middleware = validatePositiveIdParam('friendId');
+    const req = { params: { friendId: 'abc' } };
+    const res = makeRes();
+    const next = makeNext();
+    middleware(req, res, next);
+    assert.strictEqual(next.called, false);
+    assert.strictEqual(res.statusCode, 400);
+    assert.strictEqual(res.body.error, 'Invalid ID');
+  });
+
+  it('uses custom error message when provided', () => {
+    const middleware = validatePositiveIdParam('friendId', 'Invalid friend ID');
+    const req = { params: { friendId: 'x' } };
+    const res = makeRes();
+    const next = makeNext();
+    middleware(req, res, next);
+    assert.strictEqual(res.body.error, 'Invalid friend ID');
+  });
+
+  it('returns 400 for zero or negative', () => {
+    const middleware = validatePositiveIdParam('id');
+    const req = { params: { id: '0' } };
+    const res = makeRes();
+    const next = makeNext();
+    middleware(req, res, next);
+    assert.strictEqual(next.called, false);
+    assert.strictEqual(res.statusCode, 400);
   });
 });
 
